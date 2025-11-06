@@ -49,6 +49,14 @@ export function EditClientModal({ open, onClose, client, onUpdate }: EditClientM
     business_city: "",
     business_state: "",
     business_postal_code: "",
+    // Billing Information
+    billing_street_address: "",
+    billing_city: "",
+    billing_state_province: "",
+    billing_postal_code: "",
+    billing_currency: "",
+    billing_contact_name: "",
+    billing_contact_email: "",
     // Tax & Compliance
     gst_status: "",
     gstin: "",
@@ -56,6 +64,8 @@ export function EditClientModal({ open, onClose, client, onUpdate }: EditClientM
     withholding_percentage: "",
     tax_registration_number: "",
     invoice_currency_preference: "",
+    business_activities_description: "",
+    tax_certificate_url: "",
     // Banking Details
     invoice_issue_date: "",
     payment_due_date: "",
@@ -70,9 +80,13 @@ export function EditClientModal({ open, onClose, client, onUpdate }: EditClientM
     entity_type: "",
     country_of_incorporation: "",
     director_name: "",
-    has_25_ownership: false,
+    has_25_percent_ownership: false,
     beneficial_owner_1: "",
     beneficial_owner_2: "",
+    // AP Contact & Communications
+    primary_contact_name: "",
+    primary_contact_email: "",
+    additional_recipients: "",
   });
 
   const [loading, setLoading] = useState(false);
@@ -97,12 +111,21 @@ export function EditClientModal({ open, onClose, client, onUpdate }: EditClientM
         business_city: client.business_city || "",
         business_state: client.business_state || "",
         business_postal_code: client.business_postal_code || "",
+        billing_street_address: client.billing_street_address || "",
+        billing_city: client.billing_city || "",
+        billing_state_province: client.billing_state_province || "",
+        billing_postal_code: client.billing_postal_code || "",
+        billing_currency: client.billing_currency || "",
+        billing_contact_name: client.billing_contact_name || "",
+        billing_contact_email: client.billing_contact_email || "",
         gst_status: client.gst_status || "",
         gstin: client.gstin || "",
         gst_state: client.gst_state || "",
         withholding_percentage: client.withholding_percentage?.toString() || "",
         tax_registration_number: client.tax_registration_number || "",
         invoice_currency_preference: client.invoice_currency_preference || "",
+        business_activities_description: client.business_activities_description || "",
+        tax_certificate_url: client.Tax_certificate_url || "",
         invoice_issue_date: client.invoice_issue_date || "",
         payment_due_date: client.payment_due_date || "",
         invoicing_frequency: client.invoicing_frequency || "",
@@ -115,9 +138,12 @@ export function EditClientModal({ open, onClose, client, onUpdate }: EditClientM
         entity_type: client.entity_type || "",
         country_of_incorporation: client.country_of_incorporation || "",
         director_name: client.director_name || "",
-        has_25_ownership: client.has_25_ownership || false,
+        has_25_percent_ownership: client.has_25_percent_ownership || false,
         beneficial_owner_1: client.beneficial_owner_1 || "",
         beneficial_owner_2: client.beneficial_owner_2 || "",
+        primary_contact_name: client.primary_contact_name || "",
+        primary_contact_email: client.primary_contact_email || "",
+        additional_recipients: client.additional_recipients || "",
       });
     }
   }, [open, client]);
@@ -196,7 +222,7 @@ export function EditClientModal({ open, onClose, client, onUpdate }: EditClientM
                   </SelectTrigger>
                   <SelectContent>
                     {EMPLOYEE_COUNT_OPTIONS.map((option) => (
-                      <SelectItem key={option} value={option}>
+                      <SelectItem key={option} value={option} className="hover:bg-blue-500 hover:text-white">
                         {option}
                       </SelectItem>
                     ))}
@@ -335,6 +361,77 @@ export function EditClientModal({ open, onClose, client, onUpdate }: EditClientM
             </div>
           </div>
 
+          {/* Billing Information Section */}
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold text-slate-900">Billing Information</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Billing Street Address
+                </label>
+                <Input
+                  value={formData.billing_street_address}
+                  onChange={(e) => handleChange("billing_street_address", e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Billing City
+                </label>
+                <Input
+                  value={formData.billing_city}
+                  onChange={(e) => handleChange("billing_city", e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Billing State/Province
+                </label>
+                <Input
+                  value={formData.billing_state_province}
+                  onChange={(e) => handleChange("billing_state_province", e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Billing Postal Code
+                </label>
+                <Input
+                  value={formData.billing_postal_code}
+                  onChange={(e) => handleChange("billing_postal_code", e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Billing Currency
+                </label>
+                <Input
+                  value={formData.billing_currency}
+                  onChange={(e) => handleChange("billing_currency", e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Billing Contact Name
+                </label>
+                <Input
+                  value={formData.billing_contact_name}
+                  onChange={(e) => handleChange("billing_contact_name", e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Billing Email
+                </label>
+                <Input
+                  value={formData.billing_contact_email}
+                  onChange={(e) => handleChange("billing_contact_email", e.target.value)}
+                  type="email"
+                />
+              </div>
+            </div>
+          </div>
+
           {/* Tax & Compliance Section */}
           <div className="space-y-4">
             <h3 className="text-lg font-semibold text-slate-900">Tax & Compliance</h3>
@@ -349,7 +446,7 @@ export function EditClientModal({ open, onClose, client, onUpdate }: EditClientM
                   </SelectTrigger>
                   <SelectContent>
                     {GST_STATUS_OPTIONS.map((option) => (
-                      <SelectItem key={option} value={option}>
+                      <SelectItem key={option} value={option} className="hover:bg-blue-500 hover:text-white">
                         {option}
                       </SelectItem>
                     ))}
@@ -409,12 +506,34 @@ export function EditClientModal({ open, onClose, client, onUpdate }: EditClientM
                   </SelectTrigger>
                   <SelectContent>
                     {CURRENCY_OPTIONS.map((option) => (
-                      <SelectItem key={option} value={option}>
+                      <SelectItem key={option} value={option} className="hover:bg-blue-500 hover:text-white">
                         {option}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Business Activities Description
+                </label>
+                <Textarea
+                  value={formData.business_activities_description}
+                  onChange={(e) => handleChange("business_activities_description", e.target.value)}
+                  rows={3}
+                  placeholder="Describe the business activities..."
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Tax Certificate URL
+                </label>
+                <Input
+                  value={formData.tax_certificate_url}
+                  onChange={(e) => handleChange("tax_certificate_url", e.target.value)}
+                  type="url"
+                  placeholder="https://..."
+                />
               </div>
             </div>
           </div>
@@ -453,7 +572,7 @@ export function EditClientModal({ open, onClose, client, onUpdate }: EditClientM
                   </SelectTrigger>
                   <SelectContent>
                     {INVOICING_FREQUENCY_OPTIONS.map((option) => (
-                      <SelectItem key={option} value={option}>
+                      <SelectItem key={option} value={option} className="hover:bg-blue-500 hover:text-white">
                         {option}
                       </SelectItem>
                     ))}
@@ -470,7 +589,7 @@ export function EditClientModal({ open, onClose, client, onUpdate }: EditClientM
                   </SelectTrigger>
                   <SelectContent>
                     {PAYMENT_METHOD_OPTIONS.map((option) => (
-                      <SelectItem key={option} value={option}>
+                      <SelectItem key={option} value={option} className="hover:bg-blue-500 hover:text-white">
                         {option}
                       </SelectItem>
                     ))}
@@ -558,11 +677,11 @@ export function EditClientModal({ open, onClose, client, onUpdate }: EditClientM
               </div>
               <div className="flex items-center space-x-2 pt-8">
                 <Checkbox
-                  id="has_25_ownership"
-                  checked={formData.has_25_ownership}
-                  onCheckedChange={(checked) => handleChange("has_25_ownership", checked as boolean)}
+                  id="has_25_percent_ownership"
+                  checked={formData.has_25_percent_ownership}
+                  onCheckedChange={(checked) => handleChange("has_25_percent_ownership", checked as boolean)}
                 />
-                <label htmlFor="has_25_ownership" className="text-sm font-medium text-slate-700 cursor-pointer">
+                <label htmlFor="has_25_percent_ownership" className="text-sm font-medium text-slate-700 cursor-pointer">
                   Has 25% Ownership
                 </label>
               </div>
@@ -582,6 +701,43 @@ export function EditClientModal({ open, onClose, client, onUpdate }: EditClientM
                 <Input
                   value={formData.beneficial_owner_2}
                   onChange={(e) => handleChange("beneficial_owner_2", e.target.value)}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* AP Contact & Communications Section */}
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold text-slate-900">AP Contact & Communications</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Primary Contact Name
+                </label>
+                <Input
+                  value={formData.primary_contact_name}
+                  onChange={(e) => handleChange("primary_contact_name", e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Primary Contact Email
+                </label>
+                <Input
+                  value={formData.primary_contact_email}
+                  onChange={(e) => handleChange("primary_contact_email", e.target.value)}
+                  type="email"
+                />
+              </div>
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Additional Recipients
+                </label>
+                <Textarea
+                  value={formData.additional_recipients}
+                  onChange={(e) => handleChange("additional_recipients", e.target.value)}
+                  rows={3}
+                  placeholder="Enter additional email recipients (comma-separated)"
                 />
               </div>
             </div>

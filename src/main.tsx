@@ -11,6 +11,7 @@ import Dashboard from './pages/Dashboard'
 import FinanceDashboard from './pages/FinanceDashboard'
 import Clients from './pages/Clients'
 import Employees from './pages/Employees'
+import EmployeeDetails from './pages/EmployeeDetails'
 import Invoices from './pages/Invoices'
 import Reconciliation from './pages/Reconciliation'
 import Prospects from './pages/Prospects'
@@ -33,6 +34,7 @@ createRoot(document.getElementById('root')!).render(
           <Route path="clients/:id/new-subscription/step3" element={<CreateSubscriptionStep3 />} />
           <Route path="prospects" element={<Prospects />} />
           <Route path="employees" element={<Employees />} />
+          <Route path="employees/:id" element={<EmployeeDetails />} />
           <Route path="invoices" element={<Invoices />} />
           <Route path="reconciliation" element={<Reconciliation />} />
         </Route>

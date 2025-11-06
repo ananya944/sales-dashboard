@@ -74,6 +74,10 @@ export interface ExtendedClient extends Client {
 	industry?: string | null;
 	description?: string | null;
 	// Billing fields
+	billing_street_address?: string | null;
+	billing_city?: string | null;
+	billing_state_province?: string | null;
+	billing_postal_code?: string | null;
 	billing_currency?: string | null;
 	billing_contact_name?: string | null;
 	billing_contact_email?: string | null;
@@ -83,7 +87,7 @@ export interface ExtendedClient extends Client {
 	director_name?: string | null;
 	beneficial_owner_1?: string | null;
 	beneficial_owner_2?: string | null;
-	has_25_ownership?: boolean | null;
+	has_25_percent_ownership?: boolean | null;
 	tax_registration_number?: string | null;
 	// Tax & Compliance fields
 	gst_status?: string | null;

@@ -4,12 +4,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 import { ArrowLeft, Building, Mail, Phone, MapPin, Edit, Plus, FileText, Users, Receipt } from "lucide-react";
 import type { ExtendedClient } from "@/types/client";
 import { getOrganizationById, updateOrganization } from "@/services/organizationService";
+import { getEmployeesByOrganization } from "@/services/employeeService";
+import type { Employee } from "@/services/employeeService";
 import { OverviewTab } from "@/components/client-details/OverviewTab";
-import { EmployeesTab } from "@/components/client-details/EmployeesTab";
 import { InvoicesTab } from "@/components/client-details/InvoicesTab";
 import { SubscriptionsTab } from "@/components/client-details/SubscriptionsTab";
 import { EditClientModal } from "@/components/modals/EditClientModal";
@@ -23,6 +25,8 @@ export default function ClientDetails() {
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState(searchParams.get("tab") || "overview");
   const [editModalOpen, setEditModalOpen] = useState(false);
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [loadingEmployees, setLoadingEmployees] = useState(false);
   const { toast } = useToast();
 
   // Handle client update
@@ -102,7 +106,7 @@ export default function ClientDetails() {
         virtual_account_id: orgData.virtual_account_id,
         msa_document_url: orgData.msa_document_url,
         msa_signed_date: orgData.msa_signed_date,
-        has_25_ownership: orgData.has_25_ownership,
+        has_25_percent_ownership: orgData.has_25_percent_ownership,
         tax_registration_number: orgData.tax_registration_number,
         website: orgData.website,
         industry: orgData.industry,
@@ -121,6 +125,20 @@ export default function ClientDetails() {
         variant: "destructive",
       });
       throw error;
+    }
+  };
+
+  // Fetch employees for the current client
+  const fetchEmployees = async () => {
+    if (!client?.id) return;
+    try {
+      setLoadingEmployees(true);
+      const data = await getEmployeesByOrganization(client.id);
+      setEmployees(data);
+    } catch (error) {
+      console.error('Error fetching employees:', error);
+    } finally {
+      setLoadingEmployees(false);
     }
   };
 
@@ -209,7 +227,7 @@ export default function ClientDetails() {
           virtual_account_id: orgData.virtual_account_id,
           msa_document_url: orgData.msa_document_url,
           msa_signed_date: orgData.msa_signed_date,
-          has_25_ownership: orgData.has_25_ownership,
+          has_25_percent_ownership: orgData.has_25_percent_ownership,
           tax_registration_number: orgData.tax_registration_number,
           website: orgData.website,
           industry: orgData.industry,
@@ -305,7 +323,7 @@ export default function ClientDetails() {
             virtual_account_id: orgData.virtual_account_id,
             msa_document_url: orgData.msa_document_url,
             msa_signed_date: orgData.msa_signed_date,
-            has_25_ownership: orgData.has_25_ownership,
+            has_25_percent_ownership: orgData.has_25_percent_ownership,
             tax_registration_number: orgData.tax_registration_number,
             website: orgData.website,
             industry: orgData.industry,
@@ -316,6 +334,14 @@ export default function ClientDetails() {
       }
     }
   }, [searchParams, id]);
+
+  // Fetch employees when Employees tab is active
+  useEffect(() => {
+    if (client?.id && activeTab === 'employees') {
+      fetchEmployees();
+    }
+  }, [client?.id, activeTab]);
+
   if (loading) {
     return <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-center">
@@ -468,7 +494,72 @@ export default function ClientDetails() {
         </TabsContent>
 
         <TabsContent value="employees">
-          <EmployeesTab client={client} />
+          <div className="space-y-6">
+            <div className="rounded-lg border border-slate-200 bg-white shadow-sm">
+              <div className="flex items-center justify-between px-6 pt-4 pb-4 mb-4">
+                <h3 className="text-xl font-semibold">Employee Details</h3>
+                <Button className="bg-indigo-600 hover:bg-indigo-700 text-white">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Employee
+                </Button>
+              </div>
+
+              <div className="overflow-x-auto px-6 pb-6">
+                {loadingEmployees ? (
+                  <div className="flex items-center justify-center py-16">
+                    <div className="w-8 h-8 border-4 border-indigo-600/30 border-t-indigo-600 rounded-full animate-spin" />
+                    <p className="ml-3 text-slate-500">Loading employees...</p>
+                  </div>
+                ) : employees.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-16">
+                    <Users className="h-16 w-16 text-slate-300 mb-4" strokeWidth={1.5} />
+                    <p className="text-slate-500 text-sm">No employees found</p>
+                  </div>
+                ) : (
+                  <Table className="w-full table-fixed">
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-[14.28%] text-left">Name</TableHead>
+                        <TableHead className="w-[14.28%] text-left">Role</TableHead>
+                        <TableHead className="w-[14.28%] text-left">Department</TableHead>
+                        <TableHead className="w-[14.28%] text-left">Salary (INR)</TableHead>
+                        <TableHead className="w-[14.28%] text-left">Start Date</TableHead>
+                        <TableHead className="w-[14.28%] text-left">Status</TableHead>
+                        <TableHead className="w-[14.28%] text-left">Billable</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {employees.map((employee) => (
+                        <TableRow key={employee.id} className="h-14">
+                          <TableCell className="font-medium">
+                            {employee.first_name} {employee.last_name}
+                          </TableCell>
+                          <TableCell>{employee.job_title}</TableCell>
+                          <TableCell>{employee.department}</TableCell>
+                          <TableCell>
+                            {employee.salary ? `₹${employee.salary.toLocaleString('en-IN')}` : '-'}
+                          </TableCell>
+                          <TableCell>
+                            {new Date(employee.start_date).toLocaleDateString('en-GB')}
+                          </TableCell>
+                          <TableCell>
+                            <StatusBadge variant={employee.status?.toLowerCase() === 'active' ? 'active' : 'pending'}>
+                              {employee.status || 'Active'}
+                            </StatusBadge>
+                          </TableCell>
+                          <TableCell>
+                            <span className="inline-flex items-center rounded-full bg-indigo-100 px-2.5 py-0.5 text-xs font-medium text-indigo-800">
+                              Yes
+                            </span>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+              </div>
+            </div>
+          </div>
         </TabsContent>
 
         <TabsContent value="invoices">

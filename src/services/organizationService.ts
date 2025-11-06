@@ -38,6 +38,13 @@ export async function getOrganizationById(id: string) {
 
 export async function updateOrganization(id: string, updates: any) {
   try {
+    // Log the data being sent to Supabase
+    console.log('Attempting to update organization:', {
+      organizationId: id,
+      updateFields: updates,
+      timestamp: new Date().toISOString()
+    })
+
     const { data, error } = await supabase
       .from('organizations')
       .update(updates)
@@ -46,12 +53,32 @@ export async function updateOrganization(id: string, updates: any) {
       .single()
 
     if (error) {
+      // Log full error details from Supabase
+      console.error('Supabase error updating organization:', {
+        code: error.code,
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+        fullError: error,
+        organizationId: id,
+        attemptedUpdates: updates
+      })
       throw error
     }
 
     return data
-  } catch (error) {
-    console.error('Error updating organization:', error)
+  } catch (error: any) {
+    // Log comprehensive error information
+    console.error('Error updating organization - Full details:', {
+      errorCode: error?.code,
+      errorMessage: error?.message,
+      errorDetails: error?.details,
+      errorHint: error?.hint,
+      organizationId: id,
+      updateData: updates,
+      fullErrorObject: error,
+      timestamp: new Date().toISOString()
+    })
     throw error
   }
 }
