@@ -7,7 +7,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
-import { Search, Calendar, Building, Clock, ChevronDown, MoreVertical, Check, FileText, X } from "lucide-react";
+import { Search, Calendar, Building, Clock, ChevronDown, MoreVertical, Check, FileText } from "lucide-react";
 import { format } from "date-fns";
 
 // Mock prospects data
