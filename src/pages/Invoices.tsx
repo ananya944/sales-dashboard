@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -6,132 +6,110 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { StatusBadge } from "@/components/ui/status-badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Plus, Search, Filter, FileText, DollarSign, TrendingUp, Clock, Eye, Download, ChevronDown, AlertCircle } from "lucide-react";
-
-// Mock invoice data
-const mockInvoices = [
-  {
-    id: "INV-GLOBAL-002",
-    client: "Global Solutions Ltd",
-    issueDate: "15/01/2024",
-    dueDate: "30/01/2024",
-    amount: 32000,
-    tax: 1600,
-    total: 33600,
-    status: "draft",
-    currency: "USD",
-  },
-  {
-    id: "INV-ACME-001",
-    client: "Acme Corporation",
-    issueDate: "01/01/2024",
-    dueDate: "31/01/2024",
-    amount: 45000,
-    tax: 8100,
-    total: 53100,
-    status: "paid",
-    currency: "USD",
-  },
-  {
-    id: "INV-TECH-001",
-    client: "TechStart Inc",
-    issueDate: "01/01/2024",
-    dueDate: "15/01/2024",
-    amount: 28000,
-    tax: 5040,
-    total: 33040,
-    status: "sent",
-    currency: "USD",
-  },
-  {
-    id: "INV-GLOBAL-003",
-    client: "Global Solutions Ltd",
-    issueDate: "01/01/2024",
-    dueDate: "16/01/2024",
-    amount: 32000,
-    tax: 1600,
-    total: 33600,
-    status: "sent",
-    currency: "USD",
-  },
-  {
-    id: "INV-GLOBAL-001",
-    client: "Global Solutions Ltd",
-    issueDate: "15/12/2023",
-    dueDate: "30/12/2023",
-    amount: 32000,
-    tax: 1600,
-    total: 33600,
-    status: "paid",
-    currency: "USD",
-  },
-  {
-    id: "INV-TECH-002",
-    client: "TechStart Inc",
-    issueDate: "01/12/2023",
-    dueDate: "15/12/2023",
-    amount: 28000,
-    tax: 5040,
-    total: 33040,
-    status: "overdue",
-    currency: "USD",
-  },
-  {
-    id: "INV-INNOV-002",
-    client: "InnovateCorp",
-    issueDate: "01/11/2023",
-    dueDate: "25/11/2023",
-    amount: 15000,
-    tax: 0,
-    total: 15000,
-    status: "cancelled",
-    currency: "USD",
-  },
-  {
-    id: "INV-INNOV-001",
-    client: "InnovateCorp",
-    issueDate: "01/10/2023",
-    dueDate: "25/10/2023",
-    amount: 45000,
-    tax: 0,
-    total: 45000,
-    status: "paid",
-    currency: "USD",
-  },
-];
-
-const statusOptions = ["All Status", "Draft", "Sent", "Paid", "Overdue", "Cancelled"];
+import { getAllInvoices, type Invoice } from "@/services/invoiceService";
 
 export default function Invoices() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("All Status");
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const toNumber = (value: number | string | null | undefined) => {
+    if (typeof value === "number") return value;
+    if (typeof value === "string") {
+      const parsed = parseFloat(value);
+      return Number.isFinite(parsed) ? parsed : 0;
+    }
+    return 0;
+  };
+
+  useEffect(() => {
+    const fetchInvoices = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const data = await getAllInvoices();
+        setInvoices(data);
+      } catch (err) {
+        console.error("Failed to load invoices:", err);
+        setError(err instanceof Error ? err.message : "Unable to load invoices");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchInvoices();
+  }, []);
+
+  const statusOptions = useMemo(() => {
+    const uniqueStatuses = new Set<string>();
+    invoices.forEach((invoice) => {
+      if (invoice.status) {
+        uniqueStatuses.add(invoice.status);
+      }
+    });
+    return ["All Status", ...Array.from(uniqueStatuses).sort((a, b) => a.localeCompare(b))];
+  }, [invoices]);
 
   // Calculate summary metrics
-  const totalInvoices = mockInvoices.length;
-  const totalAmount = mockInvoices.reduce((sum, inv) => sum + inv.total, 0);
-  const outstandingAmount = mockInvoices
-    .filter(inv => inv.status === "sent" || inv.status === "overdue")
-    .reduce((sum, inv) => sum + inv.total, 0);
-  const overdueCount = mockInvoices.filter(inv => inv.status === "overdue").length;
+  const { totalInvoices, totalAmount, outstandingAmount, overdueCount } = useMemo(() => {
+    const totalInvoicesCount = invoices.length;
+    const totalAmountSum = invoices.reduce((sum, inv) => sum + toNumber(inv.amount), 0);
+    const outstandingAmountSum = invoices
+      .filter((inv) => {
+        const status = inv.status?.toLowerCase();
+        return status === "sent" || status === "overdue";
+      })
+      .reduce((sum, inv) => sum + toNumber(inv.amount), 0);
+    const overdue = invoices.filter((inv) => inv.status?.toLowerCase() === "overdue").length;
+
+    return {
+      totalInvoices: totalInvoicesCount,
+      totalAmount: totalAmountSum,
+      outstandingAmount: outstandingAmountSum,
+      overdueCount: overdue,
+    };
+  }, [invoices]);
+
+  const summaryCurrency = invoices[0]?.currency || "USD";
 
   // Filter invoices
-  const filteredInvoices = mockInvoices.filter(invoice => {
-    const matchesSearch = 
-      invoice.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      invoice.client.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesStatus = 
-      statusFilter === "All Status" || 
-      invoice.status.toLowerCase() === statusFilter.toLowerCase();
-    return matchesSearch && matchesStatus;
-  });
+  const filteredInvoices = useMemo(() => {
+    return invoices.filter((invoice) => {
+      const matchesSearch =
+        invoice.invoice_id?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        invoice.org_legal_name?.toLowerCase().includes(searchQuery.toLowerCase());
 
+      const matchesStatus =
+        statusFilter === "All Status" ||
+        invoice.status?.toLowerCase() === statusFilter.toLowerCase();
+
+      return matchesSearch && matchesStatus;
+    });
+  }, [invoices, searchQuery, statusFilter]);
   // Helper function to format currency
   const formatCurrency = (amount: number, currency: string = "USD") => {
-    return `${currency} ${amount.toLocaleString('en-US')}`;
+    return new Intl.NumberFormat(undefined, {
+      style: "currency",
+      currency: currency || "USD",
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2,
+    }).format(amount);
+  };
+
+  const formatStatusText = (status: string) => {
+    if (!status) return "Unknown";
+    return status
+      .replace(/_/g, " ")
+      .toLowerCase()
+      .replace(/(^|\s)\w/g, (char) => char.toUpperCase());
   };
 
   // Helper function to get status variant
   const getStatusVariant = (status: string) => {
-    switch (status) {
+    const normalized = status?.toLowerCase();
+    switch (normalized) {
       case "paid":
         return "active";
       case "sent":
@@ -143,7 +121,7 @@ export default function Invoices() {
       case "cancelled":
         return "draft";
       default:
-        return "draft";
+        return "pending";
     }
   };
 
@@ -176,7 +154,7 @@ export default function Invoices() {
             </div>
           </CardHeader>
           <CardContent className="px-4 pb-4">
-            <div className="text-xl font-bold text-slate-900">{totalInvoices}</div>
+            <div className="text-xl font-bold text-slate-900">{loading ? "—" : totalInvoices}</div>
             <p className="text-xs text-green-600 flex items-center gap-1 mt-1">
               <TrendingUp className="h-3 w-3" />
               +12% from last month
@@ -195,7 +173,9 @@ export default function Invoices() {
             </div>
           </CardHeader>
           <CardContent className="px-4 pb-4">
-            <div className="text-xl font-bold text-slate-900">${totalAmount.toLocaleString('en-US')}</div>
+            <div className="text-xl font-bold text-slate-900">
+              {loading ? "—" : formatCurrency(totalAmount, summaryCurrency)}
+            </div>
             <p className="text-xs text-green-600 flex items-center gap-1 mt-1">
               <TrendingUp className="h-3 w-3" />
               +8% from last month
@@ -214,7 +194,9 @@ export default function Invoices() {
             </div>
           </CardHeader>
           <CardContent className="px-4 pb-4">
-            <div className="text-xl font-bold text-slate-900">${outstandingAmount.toLocaleString('en-US')}</div>
+            <div className="text-xl font-bold text-slate-900">
+              {loading ? "—" : formatCurrency(outstandingAmount, summaryCurrency)}
+            </div>
             <p className="text-xs text-blue-600 flex items-center gap-1 mt-1">
               <span className="rotate-180 inline-block">
                 <TrendingUp className="h-3 w-3" />
@@ -235,7 +217,7 @@ export default function Invoices() {
             </div>
           </CardHeader>
           <CardContent className="px-4 pb-4">
-            <div className="text-xl font-bold text-slate-900">{overdueCount}</div>
+            <div className="text-xl font-bold text-slate-900">{loading ? "—" : overdueCount}</div>
             <p className="text-xs text-red-600 flex items-center gap-1 mt-1">
               <span className="rotate-180 inline-block">
                 <TrendingUp className="h-3 w-3" />
@@ -271,7 +253,7 @@ export default function Invoices() {
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" size="sm" className="h-9 px-3 text-sm">
-                  {statusFilter}
+                  {statusFilter === "All Status" ? statusFilter : formatStatusText(statusFilter)}
                   <ChevronDown className="h-4 w-4 ml-2" />
                 </Button>
               </DropdownMenuTrigger>
@@ -282,7 +264,7 @@ export default function Invoices() {
                     onClick={() => setStatusFilter(status)}
                     className="cursor-pointer text-sm"
                   >
-                    {status}
+                    {status === "All Status" ? status : formatStatusText(status)}
                   </DropdownMenuItem>
                 ))}
               </DropdownMenuContent>
@@ -300,7 +282,7 @@ export default function Invoices() {
                   <TableHead className="py-2 px-4 font-semibold text-slate-700 text-xs">Client</TableHead>
                   <TableHead className="py-2 px-4 font-semibold text-slate-700 text-xs">Issue Date</TableHead>
                   <TableHead className="py-2 px-4 font-semibold text-slate-700 text-xs">Due Date</TableHead>
-                  <TableHead className="py-2 px-4 font-semibold text-slate-700 text-xs text-right">Amount</TableHead>
+                  <TableHead className="py-2 px-4 font-semibold text-slate-700 text-xs text-right">Base Amount</TableHead>
                   <TableHead className="py-2 px-4 font-semibold text-slate-700 text-xs text-right">Tax</TableHead>
                   <TableHead className="py-2 px-4 font-semibold text-slate-700 text-xs text-right">Total</TableHead>
                   <TableHead className="py-2 px-4 font-semibold text-slate-700 text-xs">Status</TableHead>
@@ -308,47 +290,73 @@ export default function Invoices() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredInvoices.length === 0 ? (
+                {loading ? (
+                  <TableRow className="h-12">
+                    <TableCell colSpan={9} className="text-center py-8 text-slate-500">
+                      Loading invoices...
+                    </TableCell>
+                  </TableRow>
+                ) : error ? (
+                  <TableRow className="h-12">
+                    <TableCell colSpan={9} className="text-center py-8 text-red-500 text-sm">
+                      {error}
+                    </TableCell>
+                  </TableRow>
+                ) : filteredInvoices.length === 0 ? (
                   <TableRow className="h-12">
                     <TableCell colSpan={9} className="text-center py-8 text-slate-500">
                       No invoices found
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredInvoices.map((invoice) => (
+                  filteredInvoices.map((invoice) => {
+                    const baseAmount = Math.max(
+                      0,
+                      toNumber(invoice.amount) - toNumber(invoice.tax_amount)
+                    );
+                    const currency = invoice.currency || "USD";
+                    const issueDate = invoice.date
+                      ? new Date(invoice.date).toLocaleDateString("en-GB")
+                      : "—";
+                    const dueDate = invoice.due_date
+                      ? new Date(invoice.due_date).toLocaleDateString("en-GB")
+                      : "—";
+                    const statusLabel = invoice.status || "Unknown";
+
+                    return (
                     <TableRow 
-                      key={invoice.id} 
+                      key={invoice.invoice_id} 
                       className="cursor-pointer hover:bg-slate-50 h-12 transition-colors"
                     >
                       <TableCell className="py-2 px-4 text-slate-900 text-xs">
-                        {invoice.id}
+                        {invoice.invoice_id}
                       </TableCell>
                       <TableCell className="py-2 px-4 font-semibold text-slate-900 text-xs">
-                        {invoice.client}
+                        {invoice.org_legal_name}
                       </TableCell>
                       <TableCell className="py-2 px-4 text-slate-600 text-xs">
-                        {invoice.issueDate}
+                        {issueDate}
                       </TableCell>
                       <TableCell className="py-2 px-4 text-slate-600 text-xs">
                         <div className="flex items-center gap-1">
-                          {invoice.dueDate}
-                          {invoice.status === "overdue" && (
+                          {dueDate}
+                          {statusLabel.toLowerCase() === "overdue" && (
                             <AlertCircle className="h-3 w-3 text-red-500" />
                           )}
                         </div>
                       </TableCell>
                       <TableCell className="py-2 px-4 text-slate-600 text-xs text-right">
-                        {formatCurrency(invoice.amount, invoice.currency)}
+                        {formatCurrency(baseAmount, currency)}
                       </TableCell>
                       <TableCell className="py-2 px-4 text-slate-600 text-xs text-right">
-                        {formatCurrency(invoice.tax, invoice.currency)}
+                        {formatCurrency(toNumber(invoice.tax_amount), currency)}
                       </TableCell>
                       <TableCell className="py-2 px-4 font-semibold text-slate-900 text-xs text-right">
-                        {formatCurrency(invoice.total, invoice.currency)}
+                        {formatCurrency(toNumber(invoice.amount), currency)}
                       </TableCell>
                       <TableCell className="py-2 px-4">
-                        <StatusBadge variant={getStatusVariant(invoice.status)}>
-                          {invoice.status}
+                        <StatusBadge variant={getStatusVariant(statusLabel)}>
+                          {formatStatusText(statusLabel)}
                         </StatusBadge>
                       </TableCell>
                       <TableCell className="py-2 px-4">
@@ -370,7 +378,8 @@ export default function Invoices() {
                         </div>
                       </TableCell>
                     </TableRow>
-                  ))
+                    )
+                  })
                 )}
               </TableBody>
             </Table>

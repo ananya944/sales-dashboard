@@ -10,6 +10,7 @@ import { Plus, Search, Filter, MoreVertical } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { getAllOrganizations, getOrganizationById, updateOrganization } from "@/services/organizationService";
 import { EditClientModal } from "@/components/modals/EditClientModal";
+import { AddClientModal } from "@/components/modals/AddClientModal";
 import { useToast } from "@/hooks/use-toast";
 import type { ExtendedClient } from "@/types/client";
 
@@ -26,6 +27,7 @@ export default function Clients() {
     msa_status: string | null;
   }>>([]);
   const [editModalOpen, setEditModalOpen] = useState(false);
+  const [addModalOpen, setAddModalOpen] = useState(false);
   const [selectedClient, setSelectedClient] = useState<ExtendedClient | null>(null);
   const [loadingClient, setLoadingClient] = useState(false);
 
@@ -216,7 +218,10 @@ export default function Clients() {
             Manage your client accounts and relationships
           </p>
         </div>
-        <Button className="bg-indigo-600 hover:bg-indigo-700 text-white">
+        <Button
+          className="bg-indigo-600 hover:bg-indigo-700 text-white"
+          onClick={() => setAddModalOpen(true)}
+        >
           <Plus className="h-4 w-4 mr-2" />
           Add Client
         </Button>
@@ -342,6 +347,15 @@ export default function Clients() {
           onUpdate={handleUpdateClient}
         />
       )}
+
+      <AddClientModal
+        open={addModalOpen}
+        onClose={() => setAddModalOpen(false)}
+        onSuccess={async () => {
+          await loadClients();
+          setAddModalOpen(false);
+        }}
+      />
     </div>
   );
 }

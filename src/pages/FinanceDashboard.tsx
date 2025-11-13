@@ -1,44 +1,158 @@
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { DollarSign, FileText, TrendingUp, Calendar, Download, Plus, BarChart3, Users } from "lucide-react";
+import { getAllInvoices, type Invoice } from "@/services/invoiceService";
+import { useToast } from "@/hooks/use-toast";
 
-// Mock transaction data
-const recentTransactions = [
-  {
-    id: "1",
-    type: "Payment Received",
-    client: "TechCorp Ltd",
-    date: "2024-01-15",
-    amount: 250000,
-    status: "completed",
-  },
-  {
-    id: "2",
-    type: "Invoice Generated",
-    client: "StartupXYZ",
-    date: "2024-01-14",
-    amount: 175000,
-    status: "pending",
-  },
-  {
-    id: "3",
-    type: "Payment Received",
-    client: "GlobalTech Inc",
-    date: "2024-01-13",
-    amount: 325000,
-    status: "completed",
-  },
-];
+type MetricState = {
+  totalRevenue: number;
+  outstandingInvoices: number;
+  collectionRate: number;
+  averagePaymentDays: number | null;
+};
+
+const OUTSTANDING_STATUSES = new Set(["sent", "overdue", "partially paid", "partially_paid", "draft"]);
+
+const formatCurrency = (amount: number) => {
+  return new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: "INR",
+    minimumFractionDigits: 0,
+  }).format(amount);
+};
+
+const formatDate = (input: string) => {
+  if (!input) return "—";
+  const date = new Date(input);
+  if (Number.isNaN(date.getTime())) return "—";
+  return new Intl.DateTimeFormat("en-IN", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  }).format(date);
+};
+
+const determineTransactionType = (status: string) => {
+  return status.toLowerCase() === "paid" ? "Payment Received" : "Invoice Generated";
+};
+
+const formatStatusLabel = (status: string) => {
+  if (!status) return "unknown";
+  return status.replace(/_/g, " ");
+};
 
 export default function FinanceDashboard() {
-  // Helper function to format currency
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency: 'INR',
-      minimumFractionDigits: 0,
-    }).format(amount);
+  const { toast } = useToast();
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [metrics, setMetrics] = useState<MetricState>({
+    totalRevenue: 0,
+    outstandingInvoices: 0,
+    collectionRate: 0,
+    averagePaymentDays: null,
+  });
+
+  useEffect(() => {
+    const loadInvoices = async () => {
+      try {
+        setIsLoading(true);
+        const data = await getAllInvoices();
+        setInvoices(data);
+      } catch (error: any) {
+        console.error("Error loading invoices:", error);
+        toast({
+          title: "❌ Failed to load finance data",
+          description: error?.message ?? "Please try again later.",
+          variant: "destructive",
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadInvoices();
+  }, [toast]);
+
+  useEffect(() => {
+    if (!invoices.length) {
+      setMetrics({
+        totalRevenue: 0,
+        outstandingInvoices: 0,
+        collectionRate: 0,
+        averagePaymentDays: null,
+      });
+      return;
+    }
+
+    const paidInvoices = invoices.filter(
+      (invoice) => invoice.status?.toLowerCase() === "paid",
+    );
+
+    const totalRevenue = paidInvoices.reduce(
+      (sum, invoice) => sum + (Number(invoice.amount) || 0),
+      0,
+    );
+
+    const outstandingInvoices = invoices.reduce((sum, invoice) => {
+      const status = invoice.status?.toLowerCase() ?? "";
+      return OUTSTANDING_STATUSES.has(status)
+        ? sum + (Number(invoice.amount) || 0)
+        : sum;
+    }, 0);
+
+    const collectionRate =
+      invoices.length > 0 ? (paidInvoices.length / invoices.length) * 100 : 0;
+
+    const paymentDayDiffs = paidInvoices
+      .map((invoice) => {
+        if (!invoice.date || !invoice.due_date) return null;
+        const issuedAt = new Date(invoice.date);
+        const dueAt = new Date(invoice.due_date);
+        if (Number.isNaN(issuedAt.getTime()) || Number.isNaN(dueAt.getTime())) return null;
+        const diffMs = dueAt.getTime() - issuedAt.getTime();
+        return diffMs / (1000 * 60 * 60 * 24);
+      })
+      .filter((value): value is number => value !== null && Number.isFinite(value) && value >= 0);
+
+    const averagePaymentDays =
+      paymentDayDiffs.length > 0
+        ? Math.round(
+            paymentDayDiffs.reduce((sum, days) => sum + days, 0) / paymentDayDiffs.length,
+          )
+        : null;
+
+    setMetrics({
+      totalRevenue,
+      outstandingInvoices,
+      collectionRate,
+      averagePaymentDays,
+    });
+  }, [invoices]);
+
+  const recentTransactions = useMemo(() => {
+    if (!invoices.length) return [];
+
+    const sorted = [...invoices].sort((a, b) => {
+      const dateA = new Date(a.date ?? "").getTime();
+      const dateB = new Date(b.date ?? "").getTime();
+      return dateB - dateA;
+    });
+
+    return sorted.slice(0, 5);
+  }, [invoices]);
+
+  const formatMetricValue = (value: number, formatter: (input: number) => string) => {
+    if (isLoading) return "Loading...";
+    if (!Number.isFinite(value)) return "—";
+    return formatter(value);
+  };
+
+  const formatAveragePaymentDays = (value: number | null) => {
+    if (isLoading) return "Loading...";
+    if (value === null) return "N/A";
+    return `${value} days`;
   };
 
   return (
@@ -76,10 +190,12 @@ export default function FinanceDashboard() {
             </div>
           </CardHeader>
           <CardContent className="px-4 pb-4">
-            <div className="text-xl font-bold text-slate-900">₹45,23,150</div>
-            <p className="text-xs text-green-600 flex items-center gap-1 mt-1">
-              <TrendingUp className="h-3 w-3" />
-              12.5%
+            <div className="text-xl font-bold text-slate-900">
+              {formatMetricValue(metrics.totalRevenue, formatCurrency)}
+            </div>
+            <p className="text-xs text-slate-400 mt-1 flex items-center gap-1">
+              <TrendingUp className="h-3 w-3 text-slate-300" />
+              Updated just now
             </p>
           </CardContent>
         </Card>
@@ -95,12 +211,12 @@ export default function FinanceDashboard() {
             </div>
           </CardHeader>
           <CardContent className="px-4 pb-4">
-            <div className="text-xl font-bold text-slate-900">₹8,75,000</div>
-            <p className="text-xs text-red-600 flex items-center gap-1 mt-1">
-              <span className="rotate-180 inline-block">
-                <TrendingUp className="h-3 w-3" />
-              </span>
-              5.2%
+            <div className="text-xl font-bold text-slate-900">
+              {formatMetricValue(metrics.outstandingInvoices, formatCurrency)}
+            </div>
+            <p className="text-xs text-slate-400 mt-1 flex items-center gap-1">
+              <TrendingUp className="h-3 w-3 text-slate-300 rotate-180" />
+              Updated just now
             </p>
           </CardContent>
         </Card>
@@ -116,10 +232,14 @@ export default function FinanceDashboard() {
             </div>
           </CardHeader>
           <CardContent className="px-4 pb-4">
-            <div className="text-xl font-bold text-slate-900">94.5%</div>
-            <p className="text-xs text-green-600 flex items-center gap-1 mt-1">
-              <TrendingUp className="h-3 w-3" />
-              2.1%
+            <div className="text-xl font-bold text-slate-900">
+              {isLoading
+                ? "Loading..."
+                : `${metrics.collectionRate ? metrics.collectionRate.toFixed(1) : 0}%`}
+            </div>
+            <p className="text-xs text-slate-400 mt-1 flex items-center gap-1">
+              <TrendingUp className="h-3 w-3 text-slate-300" />
+              Updated just now
             </p>
           </CardContent>
         </Card>
@@ -135,12 +255,12 @@ export default function FinanceDashboard() {
             </div>
           </CardHeader>
           <CardContent className="px-4 pb-4">
-            <div className="text-xl font-bold text-slate-900">28 days</div>
-            <p className="text-xs text-red-600 flex items-center gap-1 mt-1">
-              <span className="rotate-180 inline-block">
-                <TrendingUp className="h-3 w-3" />
-              </span>
-              3 days
+            <div className="text-xl font-bold text-slate-900">
+              {formatAveragePaymentDays(metrics.averagePaymentDays)}
+            </div>
+            <p className="text-xs text-slate-400 mt-1 flex items-center gap-1">
+              <TrendingUp className="h-3 w-3 text-slate-300 rotate-180" />
+              Updated just now
             </p>
           </CardContent>
         </Card>
@@ -156,27 +276,48 @@ export default function FinanceDashboard() {
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {recentTransactions.map((transaction) => (
-                <div key={transaction.id} className="rounded-lg border border-slate-200 p-4 bg-white">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="font-semibold text-slate-900 text-sm">{transaction.type}</div>
-                      <div className="text-sm text-slate-600 mt-0.5">{transaction.client}</div>
-                      <div className="text-xs text-slate-400 mt-0.5">{transaction.date}</div>
-                    </div>
-                    <div className="text-right">
-                      <div className="font-semibold text-slate-900 text-sm">{formatCurrency(transaction.amount)}</div>
-                      <div className="mt-1">
-                        <StatusBadge 
-                          variant={transaction.status === "completed" ? "active" : "pending"}
-                        >
-                          {transaction.status}
-                        </StatusBadge>
+              {isLoading && (
+                <div className="rounded-lg border border-slate-200 p-4 bg-white text-sm text-slate-500">
+                  Loading transactions...
+                </div>
+              )}
+
+              {!isLoading && recentTransactions.length === 0 && (
+                <div className="rounded-lg border border-slate-200 p-4 bg-white text-sm text-slate-500">
+                  No transactions available.
+                </div>
+              )}
+
+              {!isLoading &&
+                recentTransactions.map((transaction) => {
+                  const status = transaction.status?.toLowerCase() ?? "";
+                  const badgeVariant = status === "paid" ? "active" : "pending";
+                  return (
+                    <div key={transaction.invoice_id} className="rounded-lg border border-slate-200 p-4 bg-white">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1">
+                          <div className="font-semibold text-slate-900 text-sm">
+                            {determineTransactionType(status)}
+                          </div>
+                          <div className="text-sm text-slate-600 mt-0.5">
+                            {transaction.org_legal_name || "Unknown Client"}
+                          </div>
+                          <div className="text-xs text-slate-400 mt-0.5">{formatDate(transaction.date)}</div>
+                        </div>
+                        <div className="text-right">
+                          <div className="font-semibold text-slate-900 text-sm">
+                            {formatCurrency(Number(transaction.amount) || 0)}
+                          </div>
+                          <div className="mt-1">
+                            <StatusBadge variant={badgeVariant}>
+                              {formatStatusLabel(status)}
+                            </StatusBadge>
+                          </div>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </div>
-              ))}
+                  );
+                })}
             </div>
           </CardContent>
         </Card>
