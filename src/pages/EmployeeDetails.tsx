@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
-import { ArrowLeft, User, Edit, Building, Mail, Phone, MapPin, Calendar, Wallet, FileText, Briefcase } from "lucide-react";
+import { ArrowLeft, User, Edit, Building, Mail, Phone, Calendar, Wallet, Briefcase } from "lucide-react";
 import { getEmployeeById, updateEmployee } from "@/services/employeeService";
 import { getOrganizationById } from "@/services/organizationService";
 import { EditEmployeeModal } from "@/components/modals/EditEmployeeModal";
