@@ -37,16 +37,28 @@ export interface ProspectDisplay {
   productUsage: string;
   organizationId: string | null;
   companyName?: string | null;
+  msaSigned: boolean;
+  complianceCompleted: boolean;
+}
+
+function normalizeBoolean(value: any): boolean {
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'number') return value === 1;
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase();
+    return normalized === 'true' || normalized === 't' || normalized === '1';
+  }
+  return false;
 }
 
 // Get onboarding progress label from completion flags
 function getProductUsageLabel(profile: any): string {
-  if (profile.onboarding_completed) return 'Employee Added';
-  if (profile.compliance_completed) return 'Compliance Declarations Completed';
-  if (profile.msa_signed) return 'MSA Signed';
-  if (profile.address_completed) return 'Address Completed';
-  if (profile.company_info_completed) return 'Company Profile Completed';
-  if (profile.basic_info_completed) return 'Basic Information Completed';
+  if (normalizeBoolean(profile.onboarding_completed)) return 'Employee Added';
+  if (normalizeBoolean(profile.compliance_completed)) return 'Compliance Declarations Completed';
+  if (normalizeBoolean(profile.msa_signed)) return 'MSA Signed';
+  if (normalizeBoolean(profile.address_completed)) return 'Address Completed';
+  if (normalizeBoolean(profile.company_info_completed)) return 'Company Profile Completed';
+  if (normalizeBoolean(profile.basic_info_completed)) return 'Basic Information Completed';
   return 'User Profile Created';
 }
 
@@ -104,7 +116,6 @@ export async function getProspects(): Promise<ProspectDisplay[]> {
           employee_count
         )
       `)
-      .or('setup_completed.is.null,setup_completed.eq.false')
       .order('created_at', { ascending: false })
 
     if (error) {
@@ -113,7 +124,6 @@ export async function getProspects(): Promise<ProspectDisplay[]> {
     }
 
     console.log('✅ Raw prospects fetched from Supabase:', data)
-
     const prospects: ProspectDisplay[] = (data || []).map((profile: any) => {
       const fullName = [profile.first_name, profile.last_name]
         .filter(Boolean)
@@ -129,11 +139,12 @@ export async function getProspects(): Promise<ProspectDisplay[]> {
         productUsage: getProductUsageLabel(profile),
         organizationId: profile.organization_id,
         companyName: profile.organization?.name ?? null,
+        msaSigned: normalizeBoolean(profile.msa_signed),
+        complianceCompleted: normalizeBoolean(profile.compliance_completed),
       }
     })
 
     console.log('✅ Normalized prospects:', prospects)
-
     return prospects
   } catch (error) {
     console.error('Error fetching prospects:', error)

@@ -5,7 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Building, Mail, Phone, MapPin, Calendar, Clock, Users, Check, CalendarDays } from "lucide-react";
+import { Building, Mail, Phone, MapPin, Calendar, Clock, Users, Check, CalendarDays, UserPlus } from "lucide-react";
 import { getProspectById, type Prospect } from "@/services/prospectService";
 import { format } from "date-fns";
 
@@ -236,7 +236,7 @@ export default function ProspectDetail() {
         </BreadcrumbList>
       </Breadcrumb>
 
-      <div className="flex items-start justify-between">
+      <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold text-slate-900">{fullName}</h1>
           <div className="mt-2 flex items-center gap-2 text-slate-600">
@@ -244,6 +244,15 @@ export default function ProspectDetail() {
             <span>{companyName}</span>
           </div>
         </div>
+        {prospect.msa_signed && (
+          <Button
+            className="bg-indigo-600 hover:bg-indigo-700 text-white gap-2"
+            onClick={() => console.log("Onboard prospect as client", prospect.id)}
+          >
+            <UserPlus className="h-4 w-4" />
+            Onboard as Client
+          </Button>
+        )}
       </div>
 
       <div className="grid gap-4 md:grid-cols-3">
