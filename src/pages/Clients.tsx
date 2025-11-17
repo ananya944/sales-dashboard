@@ -21,10 +21,14 @@ export default function Clients() {
   const [activeTab, setActiveTab] = useState("all");
   const [clients, setClients] = useState<Array<{
     id: string;
+    external_client_id: string;
     name: string;
-    country: string;
-    employee_count: string;
+    sales_spoc: string;
+    account_manager: string;
+    client_admin: string;
+    primary_contact_email: string;
     msa_status: string | null;
+    mrr: number | null;
   }>>([]);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [addModalOpen, setAddModalOpen] = useState(false);
@@ -40,10 +44,14 @@ export default function Clients() {
         // Map Supabase organizations to client format
         const formattedClients = organizations.map((org: any) => ({
           id: org.id || '',
-          name: org.name || '',
-          country: org.country || '-',
-          employee_count: org.employee_count || '-',
-          msa_status: org.msa_status
+          external_client_id: org.external_client_id || '-',
+          name: org.name || '-',
+          sales_spoc: org.sales_spoc || '-',
+          account_manager: org.account_manager || '-',
+          client_admin: org.client_admin || '-',
+          primary_contact_email: org.primary_contact_email || org.email || '-',
+          msa_status: org.msa_status,
+          mrr: typeof org.mrr === 'number' ? org.mrr : org.mrr ? Number(org.mrr) : null,
         }));
         
         setClients(formattedClients);
@@ -184,9 +192,14 @@ export default function Clients() {
 
   // Filter clients based on search and active tab
   const filteredClients = clients.filter(client => {
+    const query = searchQuery.toLowerCase();
     const matchesSearch = 
-      client.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      client.country.toLowerCase().includes(searchQuery.toLowerCase());
+      client.name.toLowerCase().includes(query) ||
+      client.external_client_id.toLowerCase().includes(query) ||
+      client.sales_spoc.toLowerCase().includes(query) ||
+      client.account_manager.toLowerCase().includes(query) ||
+      client.client_admin.toLowerCase().includes(query) ||
+      client.primary_contact_email.toLowerCase().includes(query);
     
     let matchesTab = true;
     if (activeTab === "completed") {
@@ -199,13 +212,29 @@ export default function Clients() {
   });
 
   // Helper function to get MSA status badge variant
-  const getMsaStatusVariant = (msaStatus: string | null): "active" | "pending" => {
-    return msaStatus === "completed" ? "active" : "pending";
+  const getMsaStatusDisplay = (
+    msaStatus: string | null
+  ): { label: string; variant: "active" | "onboarding" | "pending" } => {
+    switch (msaStatus) {
+      case "completed":
+        return { label: "active", variant: "active" };
+      case "pending":
+        return { label: "onboarding", variant: "onboarding" };
+      case null:
+        return { label: "pending", variant: "pending" };
+      default:
+        return { label: msaStatus || "pending", variant: "pending" };
+    }
   };
 
-  // Helper function to get MSA status label
-  const getMsaStatusLabel = (msaStatus: string | null): string => {
-    return msaStatus === "completed" ? "Completed" : "Pending";
+  const formatCurrency = (value: number | null) => {
+    if (value === null || Number.isNaN(value)) return "-";
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: "USD",
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(value);
   };
 
   return (
@@ -255,20 +284,24 @@ export default function Clients() {
         <TabsContent value={activeTab} className="space-y-6">
           <div className="rounded-lg border border-slate-200 shadow-sm bg-white overflow-hidden">
             <div className="overflow-x-auto">
-              <Table>
+              <Table className="text-sm table-fixed w-full">
                 <TableHeader>
-                  <TableRow className="h-14">
-                    <TableHead className="py-4 px-6 min-w-[200px]">Client Name</TableHead>
-                    <TableHead className="py-4 px-6">Country</TableHead>
-                    <TableHead className="py-4 px-6">Employee Count</TableHead>
-                    <TableHead className="py-4 px-6 w-32">MSA Status</TableHead>
-                    <TableHead className="py-4 px-4 w-12"></TableHead>
+                  <TableRow className="h-12">
+                    <TableHead className="py-3 px-4 w-28 whitespace-nowrap">ID</TableHead>
+                    <TableHead className="py-3 px-4 w-36">Client Name</TableHead>
+                    <TableHead className="py-3 px-4 w-28 whitespace-nowrap">Sales SPOC</TableHead>
+                    <TableHead className="py-3 px-4 w-28 whitespace-nowrap">Account Manager</TableHead>
+                    <TableHead className="py-3 px-4 w-28 whitespace-nowrap">Client Admin</TableHead>
+                    <TableHead className="py-3 px-4 w-44">Client Email</TableHead>
+                    <TableHead className="py-3 px-4 w-24">Status</TableHead>
+                    <TableHead className="py-3 px-4 w-20 text-right">MRR</TableHead>
+                    <TableHead className="py-3 px-3 w-10"></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filteredClients.length === 0 ? (
                     <TableRow className="h-16">
-                      <TableCell colSpan={5} className="text-center py-12 text-slate-500">
+                      <TableCell colSpan={9} className="text-center py-12 text-slate-500">
                         No clients found
                       </TableCell>
                     </TableRow>
@@ -276,24 +309,41 @@ export default function Clients() {
                     filteredClients.map((client) => (
                       <TableRow 
                         key={client.id} 
-                        className="cursor-pointer hover:bg-slate-50 h-16 transition-colors"
+                        className="cursor-pointer hover:bg-slate-50 h-12 transition-colors text-sm"
                         onClick={() => navigate(`/clients/${client.id}`)}
                       >
-                        <TableCell className="py-6 px-6 font-semibold text-slate-900">
+                        <TableCell className="py-3 px-4 text-slate-600 whitespace-nowrap">
+                          {client.external_client_id}
+                        </TableCell>
+                        <TableCell className="py-3 px-4 font-semibold text-slate-900">
                           {client.name}
                         </TableCell>
-                        <TableCell className="py-6 px-6 text-slate-600">
-                          {client.country}
+                        <TableCell className="py-3 px-4 text-slate-600 whitespace-nowrap">
+                          {client.sales_spoc}
                         </TableCell>
-                        <TableCell className="py-6 px-6 text-slate-600">
-                          {client.employee_count}
+                        <TableCell className="py-3 px-4 text-slate-600 whitespace-nowrap">
+                          {client.account_manager}
                         </TableCell>
-                        <TableCell className="py-6 px-6">
-                          <StatusBadge variant={getMsaStatusVariant(client.msa_status)}>
-                            {getMsaStatusLabel(client.msa_status)}
-                          </StatusBadge>
+                        <TableCell className="py-3 px-4 text-slate-600 whitespace-nowrap">
+                          {client.client_admin}
                         </TableCell>
-                        <TableCell className="py-6 px-4">
+                        <TableCell className="py-3 px-4 text-slate-600 truncate">
+                          {client.primary_contact_email}
+                        </TableCell>
+                        <TableCell className="py-3 px-4">
+                          {(() => {
+                            const { label, variant } = getMsaStatusDisplay(client.msa_status);
+                            return (
+                              <StatusBadge variant={variant}>
+                                {label}
+                              </StatusBadge>
+                            );
+                          })()}
+                        </TableCell>
+                        <TableCell className="py-3 px-4 text-right font-semibold text-slate-900 whitespace-nowrap">
+                          {formatCurrency(client.mrr)}
+                        </TableCell>
+                        <TableCell className="py-3 px-3">
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                               <Button 
