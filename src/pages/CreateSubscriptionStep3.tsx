@@ -1,11 +1,18 @@
 import React, { useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { X, DollarSign, Plus, CheckCircle, Trash2 } from "lucide-react";
-import { toast } from "@/components/ui/sonner";
-import { addSubscriptionToClient } from "@/services/mockClientService";
-import type { Subscription } from "@/types/client";
+import { useToast } from "@/hooks/use-toast";
+import { createSubscription } from "@/services/subscriptionService";
+import { getOrganizationById } from "@/services/organizationService";
+import { getEmployeesByOrganization, type Employee } from "@/services/employeeService";
+import { getProspectById, updateProspectOnboarding } from "@/services/prospectService";
+import { convertProspectToClient } from "@/services/addClientService";
+
+interface EmployeeWithEORFee extends Employee {
+  individual_eor_fee?: number | null;
+}
 
 interface LineItem {
   id: string;
@@ -16,12 +23,24 @@ interface LineItem {
 }
 
 export default function CreateSubscriptionStep3() {
-  const { id } = useParams();
+  const { id: clientId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
+  const sourcePage = location.state?.from || "clients";
+  const fallbackPath =
+    sourcePage === "prospects" ? "/prospects" : clientId ? `/clients/${clientId}` : "/clients";
+  const confirmExit = () => window.confirm("Are you sure? Your changes will be lost.");
+  const handleExit = () => {
+    if (confirmExit()) {
+      navigate(fallbackPath);
+    }
+  };
+  const { toast } = useToast();
   const [showInvoiceForm, setShowInvoiceForm] = useState(false);
   const [showInvoicePreview, setShowInvoicePreview] = useState(false);
   const [isDepositTaxable, setIsDepositTaxable] = useState(false);
   const [isEORFeeTaxable, setIsEORFeeTaxable] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
   
   // State for each section's items
   const [reimbursementItems, setReimbursementItems] = useState<LineItem[]>([]);
@@ -57,6 +76,138 @@ export default function CreateSubscriptionStep3() {
     setter((prev) =>
       prev.map((item) => (item.id === id ? { ...item, [field]: value } : item))
     );
+  };
+
+  const handleCreateSubscription = async () => {
+    if (!clientId) {
+      toast({
+        title: "Error",
+        description: "Client ID is missing",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      setIsSaving(true);
+
+      // Check if it's a prospect or client
+      let orgData;
+      let employeesData: EmployeeWithEORFee[] = [];
+      let isProspectMode = false;
+      let actualClientId = clientId;
+
+      try {
+        // Try to fetch as client first
+        orgData = await getOrganizationById(clientId);
+        try {
+          employeesData = await getEmployeesByOrganization(clientId) as EmployeeWithEORFee[];
+        } catch (empError) {
+          employeesData = [];
+        }
+      } catch (orgError) {
+        // Not a client, check if it's a prospect
+        console.log("Not found as client, checking if prospect...");
+        const prospectData = await getProspectById(clientId);
+        if (prospectData) {
+          isProspectMode = true;
+          
+          // Convert prospect to client
+          actualClientId = await convertProspectToClient(clientId);
+          
+          // Fetch the newly created client
+          orgData = await getOrganizationById(actualClientId);
+          employeesData = []; // Prospects don't have employees yet
+        } else {
+          throw new Error("ID not found as client or prospect");
+        }
+      }
+
+      const employees = employeesData;
+
+      // Calculate totals from Step 1
+      const employeeCount = employees.length;
+      const totalEorFee = employees.reduce((sum, emp) => {
+        const eorFee = emp.individual_eor_fee || 0;
+        return sum + (typeof eorFee === 'number' ? eorFee : 0);
+      }, 0);
+      const totalMonthlyPayroll = employees.reduce((sum, emp) => {
+        return sum + (emp.salary || 0);
+      }, 0);
+
+      // Step 2: Get data from localStorage
+      const step2DataStr = localStorage.getItem(`subscription_step2_${clientId}`);
+      if (!step2DataStr) {
+        toast({
+          title: "Error",
+          description: "Step 2 data not found. Please go back and complete Step 2.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const step2Data = JSON.parse(step2DataStr);
+
+      // Step 3: Invoice items (optional for now - we'll use empty arrays)
+      // The invoice items can be added later if needed
+
+      // Calculate EOR fee per employee
+      const eorFeePerEmployee = employeeCount > 0 ? totalEorFee / employeeCount : 0;
+
+      // Create subscription payload
+      const subscriptionData = {
+        client_id: actualClientId, // Use the actual client ID (newly created if prospect)
+        plan: "plan3",
+        status: "active" as const,
+        billing_cycle: step2Data.billing_cycle || "Monthly",
+        eor_fee_per_employee: eorFeePerEmployee,
+        invoice_currency: step2Data.invoice_currency || "USD",
+        fx_base_rate: step2Data.fx_base_rate || 0,
+        fx_spread: step2Data.fx_spread || 0,
+        gst_on_eor_fee: step2Data.gst_on_eor_fee !== undefined ? step2Data.gst_on_eor_fee : true,
+        employee_count: employeeCount,
+        monthly_payroll_inr: totalMonthlyPayroll,
+        monthly_eor_fee: totalEorFee,
+        start_date: new Date().toISOString().split('T')[0], // TODAY in YYYY-MM-DD format
+      };
+
+      // Save to Supabase
+      await createSubscription(subscriptionData);
+
+      // If it was a prospect, update prospect record
+      if (isProspectMode) {
+        await updateProspectOnboarding(clientId, actualClientId);
+      }
+
+      // Clear localStorage
+      localStorage.removeItem(`subscription_step2_${clientId}`);
+
+      // Show success toast
+      if (isProspectMode) {
+        toast({
+          title: "✅ Client created successfully!",
+          description: "Prospect has been converted to a client with first invoice generated.",
+        });
+        // Navigate to prospects page
+        navigate(`/prospects`);
+      } else {
+        toast({
+          title: "✅ Subscription created successfully!",
+          description: `Subscription for ${orgData.name || 'client'} has been created.`,
+        });
+        // Navigate to client page with subscriptions tab active
+        navigate(`/clients/${actualClientId}?tab=subscriptions`);
+      }
+    } catch (error: any) {
+      console.error("Error creating subscription:", error);
+      toast({
+        title: "❌ Failed to create subscription",
+        description: error.message || "An error occurred while creating the subscription.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const renderItemSection = (
@@ -156,7 +307,7 @@ export default function CreateSubscriptionStep3() {
             variant="ghost"
             size="sm"
             className="h-8 w-8 p-0"
-            onClick={() => navigate(`/clients/${id}`)}
+            onClick={handleExit}
           >
             <X className="h-4 w-4" />
           </Button>
@@ -635,7 +786,7 @@ export default function CreateSubscriptionStep3() {
             variant="outline"
             size="default"
             className="border-slate-200 text-slate-600 hover:bg-slate-50 px-6"
-            onClick={() => navigate(`/clients/${id}`)}
+            onClick={handleExit}
           >
             Cancel
           </Button>
@@ -644,45 +795,31 @@ export default function CreateSubscriptionStep3() {
               variant="outline"
               size="default"
               className="border-slate-200 text-slate-600 hover:bg-slate-50 px-6"
-              onClick={() => navigate(`/clients/${id}/new-subscription/step2`)}
+              onClick={() =>
+                navigate(`/clients/${clientId}/new-subscription/step2`, {
+                  state: location.state,
+                })
+              }
             >
               Back
             </Button>
             <Button
               size="default"
               className="bg-indigo-600 hover:bg-indigo-700 text-white px-6"
-              onClick={() => {
-                // Create new subscription object
-                const newSubscription: Subscription = {
-                  id: `SUB-${Date.now()}`,
-                  name: "subscription",
-                  planName: "PLAN1 Plan",
-                  price: 0,
-                  status: "active",
-                  createdDate: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-                  eorFee: 0, // This should come from form data
-                  billing: "Monthly",
-                  employees: 3, // This should come from form data
-                  monthlyPayroll: "₹420,000", // This should come from form data
-                  fxConfig: {
-                    baseRate: 3, // This should come from form data
-                    fxSpread: 2, // This should come from form data
-                    gstOnEorFee: true
-                  },
-                  equipment: 0,
-                  benefits: 0
-                };
-                
-                // Add subscription to client
-                if (id) {
-                  addSubscriptionToClient(id, newSubscription);
-                  toast.success("Subscription created successfully!");
-                  navigate(`/clients/${id}?tab=subscriptions`);
-                }
-              }}
+              onClick={handleCreateSubscription}
+              disabled={isSaving}
             >
-              <CheckCircle className="h-4 w-4 mr-2" />
-              Complete & Create Subscription
+              {isSaving ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />
+                  Creating...
+                </>
+              ) : (
+                <>
+                  <CheckCircle className="h-4 w-4 mr-2" />
+                  Complete & Create Subscription
+                </>
+              )}
             </Button>
           </div>
         </div>

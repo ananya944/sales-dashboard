@@ -414,7 +414,7 @@ export default function ClientDetails() {
               <Button 
                 size="sm"
                 className="h-8 px-3 text-xs"
-                onClick={() => navigate(`/clients/${id}/new-subscription`)}
+                onClick={() => navigate(`/clients/${id}/new-subscription`, { state: { from: "clients" } })}
               >
                 <Plus className="h-3.5 w-3.5 mr-1.5" />
                 New Subscription

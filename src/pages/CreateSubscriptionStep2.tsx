@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { X, Star, ChevronDown, Check, Info } from "lucide-react";
@@ -23,11 +23,36 @@ const currencies: Currency[] = [
 export default function CreateSubscriptionStep2() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
+  const sourcePage = location.state?.from || "clients";
+  const fallbackPath =
+    sourcePage === "prospects" ? "/prospects" : id ? `/clients/${id}` : "/clients";
+  const confirmExit = () => window.confirm("Are you sure? Your changes will be lost.");
+  const handleExit = () => {
+    if (confirmExit()) {
+      navigate(fallbackPath);
+    }
+  };
+  
+  // Form state
+  const [billingCycle, setBillingCycle] = useState<string>("Monthly");
+  const [billDay, setBillDay] = useState<string>("1st");
+  const [invoiceCurrency, setInvoiceCurrency] = useState<string>("USD");
+  const [fxBaseRate, setFxBaseRate] = useState<number>(83.2500);
+  const [fxSpread, setFxSpread] = useState<number>(2.0);
+  const [gstOnEorFee, setGstOnEorFee] = useState<boolean>(true);
+  
+  // UI state
   const [selectedCurrency, setSelectedCurrency] = useState<Currency>(currencies[0]);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [pendingCurrency, setPendingCurrency] = useState<Currency | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Initialize invoice currency to match selected currency
+  useEffect(() => {
+    setInvoiceCurrency(selectedCurrency.code);
+  }, []);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -48,6 +73,7 @@ export default function CreateSubscriptionStep2() {
       setIsDropdownOpen(false);
     } else {
       setSelectedCurrency(currency);
+      setInvoiceCurrency(currency.code);
       setIsDropdownOpen(false);
     }
   };
@@ -55,6 +81,7 @@ export default function CreateSubscriptionStep2() {
   const confirmCurrencyChange = () => {
     if (pendingCurrency) {
       setSelectedCurrency(pendingCurrency);
+      setInvoiceCurrency(pendingCurrency.code);
       setPendingCurrency(null);
     }
     setShowConfirmModal(false);
@@ -63,6 +90,26 @@ export default function CreateSubscriptionStep2() {
   const cancelCurrencyChange = () => {
     setPendingCurrency(null);
     setShowConfirmModal(false);
+  };
+
+  const handleContinue = () => {
+    // Save Step 2 data to localStorage for Step 3 to access
+    const step2Data = {
+      billing_cycle: billingCycle,
+      bill_day: billDay,
+      invoice_currency: invoiceCurrency,
+      fx_base_rate: fxBaseRate,
+      fx_spread: fxSpread,
+      gst_on_eor_fee: gstOnEorFee,
+    };
+    
+    localStorage.setItem(`subscription_step2_${id}`, JSON.stringify(step2Data));
+    console.log("Step 2 Data saved:", step2Data);
+    
+    // Navigate to Step 3
+    navigate(`/clients/${id}/new-subscription/step3`, {
+      state: location.state,
+    });
   };
 
   return (
@@ -75,7 +122,7 @@ export default function CreateSubscriptionStep2() {
             variant="ghost"
             size="sm"
             className="h-8 w-8 p-0"
-            onClick={() => navigate(`/clients/${id}`)}
+            onClick={handleExit}
           >
             <X className="h-4 w-4" />
           </Button>
@@ -123,22 +170,30 @@ export default function CreateSubscriptionStep2() {
                 <div className="grid grid-cols-3 gap-4">
                   <div>
                     <label className="text-sm font-medium text-black mb-1.5 block">Billing Cycle</label>
-                    <select className="w-full h-9 rounded-md border border-slate-300 bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
-                      <option>Monthly</option>
-                      <option>Quarterly</option>
-                      <option>Annual</option>
+                    <select 
+                      value={billingCycle}
+                      onChange={(e) => setBillingCycle(e.target.value)}
+                      className="w-full h-9 rounded-md border border-slate-300 bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    >
+                      <option value="Monthly">Monthly</option>
+                      <option value="Quarterly">Quarterly</option>
+                      <option value="Annual">Annual</option>
                     </select>
                   </div>
                   <div>
                     <label className="text-sm font-medium text-black mb-1.5 block">Bill Day</label>
-                    <select className="w-full h-9 rounded-md border border-slate-300 bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
-                      <option>1st</option>
-                      <option>5th</option>
-                      <option>10th</option>
-                      <option>15th</option>
-                      <option>20th</option>
-                      <option>25th</option>
-                      <option>End of Month</option>
+                    <select 
+                      value={billDay}
+                      onChange={(e) => setBillDay(e.target.value)}
+                      className="w-full h-9 rounded-md border border-slate-300 bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    >
+                      <option value="1st">1st</option>
+                      <option value="5th">5th</option>
+                      <option value="10th">10th</option>
+                      <option value="15th">15th</option>
+                      <option value="20th">20th</option>
+                      <option value="25th">25th</option>
+                      <option value="EOM">End of Month</option>
                     </select>
                   </div>
                   <div ref={dropdownRef}>
@@ -222,8 +277,9 @@ export default function CreateSubscriptionStep2() {
                     <input 
                       type="number"
                       step="0.0001"
+                      value={fxBaseRate}
+                      onChange={(e) => setFxBaseRate(parseFloat(e.target.value) || 0)}
                       className="w-full h-9 rounded-md border border-slate-300 bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" 
-                      defaultValue="83.2500" 
                     />
                     <div className="text-xs text-slate-500 mt-1">INR per CAD</div>
                   </div>
@@ -232,21 +288,32 @@ export default function CreateSubscriptionStep2() {
                     <input 
                       type="number"
                       step="0.1"
+                      value={fxSpread}
+                      onChange={(e) => setFxSpread(parseFloat(e.target.value) || 0)}
                       className="w-full h-9 rounded-md border border-slate-300 bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" 
-                      defaultValue="2.0" 
                     />
                   </div>
                   <div>
                     <label className="text-sm font-medium text-black mb-1.5 block">GST on EOR Fee</label>
                     <div className="flex items-center gap-2 h-9">
-                      <button className="relative inline-flex h-6 w-11 items-center rounded-full bg-indigo-600 transition-colors">
-                        <span className="inline-block h-5 w-5 translate-x-5 rounded-full bg-white transition-transform" />
+                      <button 
+                        type="button"
+                        onClick={() => setGstOnEorFee(!gstOnEorFee)}
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                          gstOnEorFee ? 'bg-indigo-600' : 'bg-slate-300'
+                        }`}
+                      >
+                        <span className={`inline-block h-5 w-5 rounded-full bg-white transition-transform ${
+                          gstOnEorFee ? 'translate-x-5' : 'translate-x-0.5'
+                        }`} />
                       </button>
-                      <span className="text-sm text-slate-700">Enabled</span>
+                      <span className="text-sm text-slate-700">{gstOnEorFee ? 'Enabled' : 'Disabled'}</span>
                     </div>
-                    <div className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-700 mt-1">
-                      GST Applicable
-                    </div>
+                    {gstOnEorFee && (
+                      <div className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-700 mt-1">
+                        GST Applicable
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -309,7 +376,7 @@ export default function CreateSubscriptionStep2() {
             variant="outline"
             size="default"
             className="border-slate-200 text-slate-600 hover:bg-slate-50 px-6"
-            onClick={() => navigate(`/clients/${id}`)}
+          onClick={handleExit}
           >
             Cancel
           </Button>
@@ -318,14 +385,18 @@ export default function CreateSubscriptionStep2() {
               variant="outline"
               size="default"
               className="border-slate-200 text-slate-600 hover:bg-slate-50 px-6"
-              onClick={() => navigate(`/clients/${id}/new-subscription`)}
+            onClick={() =>
+              navigate(`/clients/${id}/new-subscription`, {
+                state: location.state,
+              })
+            }
             >
               Back
             </Button>
             <Button
               size="default"
               className="bg-indigo-600 hover:bg-indigo-700 text-white px-6"
-              onClick={() => navigate(`/clients/${id}/new-subscription/step3`)}
+              onClick={handleContinue}
             >
               Continue
             </Button>

@@ -39,6 +39,7 @@ export interface ProspectDisplay {
   companyName?: string | null;
   msaSigned: boolean;
   complianceCompleted: boolean;
+  onboardingCompleted: boolean;
 }
 
 function normalizeBoolean(value: any): boolean {
@@ -141,6 +142,7 @@ export async function getProspects(): Promise<ProspectDisplay[]> {
         companyName: profile.organization?.name ?? null,
         msaSigned: normalizeBoolean(profile.msa_signed),
         complianceCompleted: normalizeBoolean(profile.compliance_completed),
+        onboardingCompleted: normalizeBoolean(profile.onboarding_completed),
       }
     })
 
@@ -229,5 +231,53 @@ export async function getProspectById(id: string): Promise<Prospect | null> {
   } catch (error) {
     console.error('💥 Fatal error fetching prospect by ID:', error)
     throw error
+  }
+}
+
+export async function updateProspectOnboarding(
+  prospectId: string,
+  clientId: string
+): Promise<void> {
+  try {
+    const { error } = await supabase
+      .from('profiles')
+      .update({
+        onboarding_completed: true,
+        onboarding_completed_at: new Date().toISOString(),
+        organization_id: clientId,
+      })
+      .eq('id', prospectId);
+
+    if (error) {
+      console.error('❌ Error updating prospect onboarding:', error);
+      throw error;
+    }
+
+    console.log('✅ Prospect onboarding updated successfully');
+  } catch (error) {
+    console.error('💥 Fatal error updating prospect onboarding:', error);
+    throw error;
+  }
+}
+
+export async function findClientByProspectId(
+  prospectId: string
+): Promise<string | null> {
+  try {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('organization_id')
+      .eq('id', prospectId)
+      .single();
+
+    if (error) {
+      console.error('❌ Error finding client by prospect ID:', error);
+      return null;
+    }
+
+    return data?.organization_id || null;
+  } catch (error) {
+    console.error('💥 Fatal error finding client by prospect ID:', error);
+    return null;
   }
 }

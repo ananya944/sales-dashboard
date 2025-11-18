@@ -8,9 +8,9 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { Textarea } from "@/components/ui/textarea";
-import { Search, Calendar, Building, Clock, ChevronDown, Check, MoreVertical, FileText, UserPlus, XCircle } from "lucide-react";
+import { Search, Calendar, Building, Clock, ChevronDown, Check, MoreVertical, FileText, UserPlus, XCircle, Eye } from "lucide-react";
 import { format } from "date-fns";
-import { getProspects, type ProspectDisplay } from "@/services/prospectService";
+import { getProspects, type ProspectDisplay, findClientByProspectId } from "@/services/prospectService";
 
 export default function Prospects() {
   const navigate = useNavigate();
@@ -283,13 +283,13 @@ export default function Prospects() {
           <Table>
             <TableHeader>
               <TableRow className="h-10 bg-slate-50">
-                <TableHead className="py-2 px-4 font-semibold text-slate-700 text-xs">Name</TableHead>
-                <TableHead className="py-2 px-4 font-semibold text-slate-700 text-xs">Company</TableHead>
-                <TableHead className="py-2 px-4 font-semibold text-slate-700 text-xs">Contact</TableHead>
-                <TableHead className="py-2 px-4 font-semibold text-slate-700 text-xs">Sign-up Date</TableHead>
-                <TableHead className="py-2 px-4 font-semibold text-slate-700 text-xs">Last Active</TableHead>
-                <TableHead className="py-2 px-4 font-semibold text-slate-700 text-xs">Product Usage</TableHead>
-                <TableHead className="py-2 px-4 font-semibold text-slate-700 text-xs text-right">Actions</TableHead>
+                <TableHead className="py-2 px-4 font-semibold text-slate-700 text-xs align-middle">Name</TableHead>
+                <TableHead className="py-2 px-4 font-semibold text-slate-700 text-xs align-middle">Company</TableHead>
+                <TableHead className="py-2 px-4 font-semibold text-slate-700 text-xs align-middle">Contact</TableHead>
+                <TableHead className="py-2 px-4 font-semibold text-slate-700 text-xs align-middle whitespace-nowrap">Sign-up Date</TableHead>
+                <TableHead className="py-2 px-4 font-semibold text-slate-700 text-xs align-middle whitespace-nowrap">Last Active</TableHead>
+                <TableHead className="py-2 px-4 font-semibold text-slate-700 text-xs align-middle whitespace-nowrap">Product Usage</TableHead>
+                <TableHead className="py-2 px-4 font-semibold text-slate-700 text-xs text-right align-middle">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -312,13 +312,13 @@ export default function Prospects() {
                     className="cursor-pointer hover:bg-slate-50 h-12 transition-colors"
                     onClick={() => navigate(`/prospects/${prospect.id}`)}
                   >
-                    <TableCell className="py-2 px-4 text-slate-900 text-xs">
+                    <TableCell className="py-2 px-4 text-slate-900 text-xs align-middle">
                       {prospect.name}
                     </TableCell>
-                    <TableCell className="py-2 px-4 text-slate-600 text-xs">
+                    <TableCell className="py-2 px-4 text-slate-600 text-xs align-middle">
                       {prospect.company}
                     </TableCell>
-                    <TableCell className="py-2 px-4 text-xs">
+                    <TableCell className="py-2 px-4 text-xs align-middle">
                       <a 
                         href={`mailto:${prospect.email}`} 
                         className="text-indigo-600 hover:text-indigo-700 hover:underline"
@@ -327,56 +327,85 @@ export default function Prospects() {
                         {prospect.email}
                       </a>
                     </TableCell>
-                    <TableCell className="py-2 px-4 text-slate-600 text-xs">
+                    <TableCell className="py-2 px-4 text-slate-600 text-xs align-middle">
                       {prospect.signupDate}
                     </TableCell>
-                    <TableCell className="py-2 px-4 text-slate-600 text-xs">
+                    <TableCell className="py-2 px-4 text-slate-600 text-xs align-middle">
                       {prospect.lastActive}
                     </TableCell>
-                    <TableCell className="py-2 px-4 text-slate-600 text-xs">
+                    <TableCell className="py-2 px-4 text-slate-600 text-xs align-middle">
                       {prospect.productUsage}
                     </TableCell>
-                    <TableCell className="py-2 px-4 text-right">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
+                    <TableCell className="py-2 px-4 text-right align-middle">
+                      {stageFilter === "MSA Signed" && prospect.onboardingCompleted ? (
+                        <div className="flex items-center gap-2 justify-end h-7">
+                          <span className="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-700 whitespace-nowrap">
+                            Converted to Client
+                          </span>
                           <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7 text-slate-600"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <MoreVertical className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-48">
-                          <DropdownMenuItem
-                            onClick={(e) => {
+                            variant="outline"
+                            size="sm"
+                            className="h-7 px-2 text-xs whitespace-nowrap"
+                            onClick={async (e) => {
                               e.stopPropagation();
-                              openNoteModal(prospect);
+                              const clientId = await findClientByProspectId(prospect.id);
+                              if (clientId) {
+                                navigate(`/clients/${clientId}`);
+                              } else {
+                                console.error("Client ID not found for prospect");
+                              }
                             }}
-                            className="cursor-pointer text-sm py-2 text-slate-800"
                           >
-                            <div className="flex items-center gap-2">
-                              <FileText className="h-4 w-4 text-slate-800" />
-                              <span>Add Note</span>
-                            </div>
-                          </DropdownMenuItem>
-                          {stageFilter === "MSA Signed" && (
-                            <DropdownMenuItem
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                console.log('Onboard prospect as client', prospect.id);
-                              }}
-                              className="cursor-pointer text-sm py-2 text-slate-800"
-                            >
-                              <div className="flex items-center gap-2">
-                                <UserPlus className="h-4 w-4 text-slate-800" />
-                                <span>Onboard as a Client</span>
-                              </div>
-                            </DropdownMenuItem>
-                          )}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                            <Eye className="h-3.5 w-3.5 mr-1" />
+                            View Client
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-end h-7">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7 text-slate-600"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <MoreVertical className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-48">
+                              <DropdownMenuItem
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  openNoteModal(prospect);
+                                }}
+                                className="cursor-pointer text-sm py-2 text-slate-800"
+                              >
+                                <div className="flex items-center gap-2">
+                                  <FileText className="h-4 w-4 text-slate-800" />
+                                  <span>Add Note</span>
+                                </div>
+                              </DropdownMenuItem>
+                              {(stageFilter === "MSA Signed" || stageFilter === "Employee Added") && (
+                                <DropdownMenuItem
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    navigate(`/clients/${prospect.id}/new-subscription`, {
+                                      state: { from: "prospects" },
+                                    });
+                                  }}
+                                  className="cursor-pointer text-sm py-2 text-slate-800"
+                                >
+                                  <div className="flex items-center gap-2">
+                                    <UserPlus className="h-4 w-4 text-slate-800" />
+                                    <span>Onboard as a Client</span>
+                                  </div>
+                                </DropdownMenuItem>
+                              )}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))

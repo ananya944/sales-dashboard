@@ -247,7 +247,11 @@ export default function ProspectDetail() {
         {prospect.msa_signed && (
           <Button
             className="bg-indigo-600 hover:bg-indigo-700 text-white gap-2"
-            onClick={() => console.log("Onboard prospect as client", prospect.id)}
+            onClick={() =>
+              navigate(`/clients/${prospect.id}/new-subscription`, {
+                state: { from: "prospects" },
+              })
+            }
           >
             <UserPlus className="h-4 w-4" />
             Onboard as Client
