@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { X, DollarSign, Plus, CheckCircle, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { createSubscription } from "@/services/subscriptionService";
-import { getOrganizationById } from "@/services/organizationService";
+import { getOrganizationById, updateOrganization } from "@/services/organizationService";
 import { getEmployeesByOrganization, type Employee } from "@/services/employeeService";
 import { getProspectById, updateProspectOnboarding } from "@/services/prospectService";
 import { convertProspectToClient } from "@/services/addClientService";
@@ -125,15 +125,35 @@ export default function CreateSubscriptionStep3() {
 
       const employees = employeesData;
 
-      // Calculate totals from Step 1
-      const employeeCount = employees.length;
-      const totalEorFee = employees.reduce((sum, emp) => {
+      // Calculate totals from Step 1 (with overrides if Step 1 edits exist)
+      let employeeCount = employees.length;
+      let totalEorFee = employees.reduce((sum, emp) => {
         const eorFee = emp.individual_eor_fee || 0;
-        return sum + (typeof eorFee === 'number' ? eorFee : 0);
+        return sum + (typeof eorFee === "number" ? eorFee : 0);
       }, 0);
-      const totalMonthlyPayroll = employees.reduce((sum, emp) => {
+      let totalMonthlyPayroll = employees.reduce((sum, emp) => {
         return sum + (emp.salary || 0);
       }, 0);
+
+      const step1EmployeesStr = localStorage.getItem(`subscription_step1_${clientId}`);
+      if (step1EmployeesStr) {
+        try {
+          const parsed = JSON.parse(step1EmployeesStr);
+          if (Array.isArray(parsed.employees) && parsed.employees.length > 0) {
+            employeeCount = parsed.employees.length;
+            totalEorFee = parsed.employees.reduce(
+              (sum: number, emp: any) => sum + (Number(emp.eorFee) || 0),
+              0
+            );
+            totalMonthlyPayroll = parsed.employees.reduce(
+              (sum: number, emp: any) => sum + (Number(emp.salaryInr) || 0),
+              0
+            );
+          }
+        } catch (error) {
+          console.error("Error parsing Step 1 employee data for Step 3:", error);
+        }
+      }
 
       // Step 2: Get data from localStorage
       const step2DataStr = localStorage.getItem(`subscription_step2_${clientId}`);
@@ -174,6 +194,20 @@ export default function CreateSubscriptionStep3() {
       // Save to Supabase
       await createSubscription(subscriptionData);
 
+      // Update organization's MRR with the calculated monthly EOR fee
+      try {
+        await updateOrganization(actualClientId, { mrr: totalEorFee });
+        console.log(`✅ Updated organization MRR to $${totalEorFee} for client ${actualClientId}`);
+      } catch (mrrError) {
+        console.error("❌ Error updating organization MRR:", mrrError);
+        // Don't fail the whole operation if MRR update fails, but log it
+        toast({
+          title: "⚠️ Warning",
+          description: "Subscription created successfully, but MRR update failed. Please update manually.",
+          variant: "default",
+        });
+      }
+
       // If it was a prospect, update prospect record
       if (isProspectMode) {
         await updateProspectOnboarding(clientId, actualClientId);
@@ -181,6 +215,7 @@ export default function CreateSubscriptionStep3() {
 
       // Clear localStorage
       localStorage.removeItem(`subscription_step2_${clientId}`);
+      localStorage.removeItem(`subscription_step1_${clientId}`);
 
       // Show success toast
       if (isProspectMode) {

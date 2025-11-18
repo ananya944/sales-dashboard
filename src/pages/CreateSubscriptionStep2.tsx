@@ -34,7 +34,16 @@ export default function CreateSubscriptionStep2() {
     }
   };
   
-  // Form state
+interface EmployeeSummary {
+  id: string;
+  name: string;
+  role: string;
+  salaryInr: number;
+  startDate?: string | null;
+  eorFee: number;
+}
+
+// Form state
   const [billingCycle, setBillingCycle] = useState<string>("Monthly");
   const [billDay, setBillDay] = useState<string>("1st");
   const [invoiceCurrency, setInvoiceCurrency] = useState<string>("USD");
@@ -48,6 +57,12 @@ export default function CreateSubscriptionStep2() {
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [pendingCurrency, setPendingCurrency] = useState<Currency | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const [employeeSummary, setEmployeeSummary] = useState<EmployeeSummary[]>([]);
+  const [summaryTotals, setSummaryTotals] = useState({
+    employeeCount: 0,
+    monthlyPayrollInr: 0,
+    monthlyEorFeeUsd: 0,
+  });
 
   // Initialize invoice currency to match selected currency
   useEffect(() => {
@@ -65,6 +80,48 @@ export default function CreateSubscriptionStep2() {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  useEffect(() => {
+    if (!id) return;
+    const stored = localStorage.getItem(`subscription_step1_${id}`);
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed.employees)) {
+          setEmployeeSummary(parsed.employees);
+        }
+        if (parsed.totals) {
+          setSummaryTotals({
+            employeeCount: parsed.totals.employeeCount || parsed.employees?.length || 0,
+            monthlyPayrollInr: parsed.totals.monthlyPayrollInr || 0,
+            monthlyEorFeeUsd: parsed.totals.monthlyEorFeeUsd || 0,
+          });
+        } else if (Array.isArray(parsed.employees)) {
+          setSummaryTotals({
+            employeeCount: parsed.employees.length,
+            monthlyPayrollInr: parsed.employees.reduce(
+              (sum: number, emp: EmployeeSummary) => sum + (emp.salaryInr || 0),
+              0
+            ),
+            monthlyEorFeeUsd: parsed.employees.reduce(
+              (sum: number, emp: EmployeeSummary) => sum + (emp.eorFee || 0),
+              0
+            ),
+          });
+        }
+      } catch (err) {
+        console.error("Error parsing Step 1 employee data:", err);
+      }
+    }
+  }, [id]);
+
+  const formatInr = (value: number) => {
+    return `₹${value.toLocaleString("en-IN")}`;
+  };
+
+  const formatUsd = (value: number) => {
+    return `$${value.toFixed(2)}`;
+  };
 
   const handleCurrencySelect = (currency: Currency) => {
     if (currency.code !== "USD") {
@@ -339,27 +396,42 @@ export default function CreateSubscriptionStep2() {
                       <div>CTC (USD)</div>
                       <div>EOR FEE (USD)</div>
                     </div>
-                    {/* Table Rows */}
-                    {[
-                      { name: "Anjali Verma", role: "Team Lead", ctc: "₹180,000", fee: "$200" },
-                      { name: "Rahul Joshi", role: "Data Scientist", ctc: "₹140,000", fee: "$160" },
-                      { name: "Kavya Menon", role: "UX Designer", ctc: "₹100,000", fee: "$135" },
-                    ].map((employee, idx) => (
-                      <div key={idx} className="grid grid-cols-5 px-4 py-3 text-sm border-b border-indigo-100">
-                        <div className="font-semibold text-slate-900">{employee.name}</div>
-                        <div className="text-slate-700">{employee.role}</div>
-                        <div className="text-slate-900">{employee.ctc}</div>
-                        <div className="text-slate-500">-</div>
-                        <div className="text-indigo-600 font-semibold">{employee.fee}</div>
+                    {employeeSummary.length > 0 ? (
+                      <>
+                        {employeeSummary.map((employee) => (
+                          <div
+                            key={employee.id}
+                            className="grid grid-cols-5 px-4 py-3 text-sm border-b border-indigo-100"
+                          >
+                            <div className="font-semibold text-slate-900">{employee.name}</div>
+                            <div className="text-slate-700">{employee.role}</div>
+                            <div className="text-slate-900">{formatInr(employee.salaryInr || 0)}</div>
+                            <div className="text-slate-500">-</div>
+                            <div className="text-indigo-600 font-semibold">
+                              {formatUsd(employee.eorFee || 0)}
+                            </div>
+                          </div>
+                        ))}
+                        {/* Total Row */}
+                        <div className="grid grid-cols-5 px-4 py-3 border-t-2 border-indigo-200 bg-white/50">
+                          <div className="col-span-2 font-semibold text-slate-900">
+                            Total ({summaryTotals.employeeCount} billable{" "}
+                            {summaryTotals.employeeCount === 1 ? "employee" : "employees"})
+                          </div>
+                          <div className="font-semibold text-slate-900">
+                            {formatInr(summaryTotals.monthlyPayrollInr)}
+                          </div>
+                          <div className="text-slate-500">-</div>
+                          <div className="text-indigo-600 font-semibold">
+                            {formatUsd(summaryTotals.monthlyEorFeeUsd)}
+                          </div>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="px-4 py-6 text-sm text-slate-600">
+                        No employee data available. Please go back to Step 1 to review employee information.
                       </div>
-                    ))}
-                    {/* Total Row */}
-                    <div className="grid grid-cols-5 px-4 py-3 border-t-2 border-indigo-200 bg-white/50">
-                      <div className="col-span-2 font-semibold text-slate-900">Total (3 billable employees)</div>
-                      <div className="font-semibold text-slate-900">₹420,000</div>
-                      <div className="text-slate-500">-</div>
-                      <div className="text-indigo-600 font-semibold">$495</div>
-                    </div>
+                    )}
                   </div>
                   <div className="px-4 py-2 border-t border-indigo-100 text-xs text-slate-500">
                     EOR fees include GST.

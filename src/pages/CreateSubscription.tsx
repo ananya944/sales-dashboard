@@ -34,6 +34,7 @@ export default function CreateSubscription() {
   const [employees, setEmployees] = useState<EmployeeWithEORFee[]>([]);
   const [isProspect, setIsProspect] = useState(false);
   const [editingField, setEditingField] = useState<string | null>(null);
+  const [editingEmployeeId, setEditingEmployeeId] = useState<string | null>(null);
   const [editedData, setEditedData] = useState({
     legalName: "",
     clientId: "",
@@ -42,6 +43,7 @@ export default function CreateSubscription() {
     invoiceCurrencyPreference: "",
     billingAddress: "",
   });
+  const [editedEorFee, setEditedEorFee] = useState<string>("");
 
   // Fetch client and employee data on page load
   useEffect(() => {
@@ -155,12 +157,27 @@ export default function CreateSubscription() {
   }, [clientId]);
 
   const handleEdit = (field: string) => {
+    if (!clientData) return;
+    
+    // Initialize editedData with current value when starting to edit
+    setEditedData((prev) => ({
+      ...prev,
+      [field]: clientData[field] || "",
+    }));
+    
     setEditingField(field);
   };
 
   const handleSave = (field: string) => {
+    if (!clientData) return;
+    
+    // Update clientData with the edited value
+    setClientData((prev: any) => ({
+      ...prev,
+      [field]: editedData[field as keyof typeof editedData],
+    }));
+    
     setEditingField(null);
-    // Here you would typically save to backend
   };
 
   const handleCancel = (field: string) => {
@@ -178,14 +195,72 @@ export default function CreateSubscription() {
     }
   };
 
+  const handleEditEorFee = (employeeId: string, currentFee: number | null | undefined) => {
+    setEditingEmployeeId(employeeId);
+    setEditedEorFee(currentFee !== null && currentFee !== undefined ? currentFee.toString() : "0");
+  };
+
+  const handleSaveEorFee = (employeeId: string) => {
+    const feeValue = parseFloat(editedEorFee) || 0;
+    
+    // Update the employee's EOR fee in the employees state
+    setEmployees((prev) =>
+      prev.map((emp) =>
+        emp.id === employeeId
+          ? { ...emp, individual_eor_fee: feeValue }
+          : emp
+      )
+    );
+    
+    setEditingEmployeeId(null);
+    setEditedEorFee("");
+  };
+
+  const handleCancelEorFee = () => {
+    setEditingEmployeeId(null);
+    setEditedEorFee("");
+  };
+
+  const handleContinue = () => {
+    if (!clientId) return;
+
+    const employeeSummary = employees.map((emp) => ({
+      id: emp.id,
+      name: `${emp.first_name || ""} ${emp.last_name || ""}`.trim() || emp.email || "-",
+      role: emp.job_title || "-",
+      salaryInr: emp.salary || 0,
+      startDate: emp.start_date || null,
+      eorFee: typeof emp.individual_eor_fee === "number" ? emp.individual_eor_fee : 0,
+    }));
+
+    const step1Data = {
+      employees: employeeSummary,
+      totals: {
+        employeeCount: employeeSummary.length,
+        monthlyPayrollInr: totalMonthlyPayroll,
+        monthlyEorFeeUsd: totalEorFee,
+      },
+    };
+
+    localStorage.setItem(`subscription_step1_${clientId}`, JSON.stringify(step1Data));
+
+    navigate(`/clients/${clientId}/new-subscription/step2`, {
+      state: location.state,
+    });
+  };
+
   const handleChange = (field: string, value: string) => {
     setEditedData(prev => ({ ...prev, [field]: value }));
   };
 
-  // Calculate total EOR fee
+  // Calculate totals
   const totalEorFee = employees.reduce((sum, emp) => {
     const eorFee = emp.individual_eor_fee || 0;
     return sum + (typeof eorFee === 'number' ? eorFee : 0);
+  }, 0);
+
+  const totalMonthlyPayroll = employees.reduce((sum, emp) => {
+    return sum + (emp.salary || 0);
   }, 0);
 
   // Format date for display
@@ -351,7 +426,7 @@ export default function CreateSubscription() {
                   </div>
                 ) : (
                   <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium text-slate-900">{editingField === "clientId" ? editedData.clientId : clientData.clientId}</span>
+                    <span className="text-sm font-medium text-slate-900">{clientData.clientId}</span>
                     <Button variant="ghost" size="sm" className="h-5 w-5 p-0" onClick={() => handleEdit("clientId")}>
                       <Pencil className="h-1.5 w-1.5 text-slate-500" />
                     </Button>
@@ -378,7 +453,7 @@ export default function CreateSubscription() {
                   </div>
                 ) : (
                   <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium text-slate-900">{editingField === "billingEmail" ? editedData.billingEmail : clientData.billingEmail}</span>
+                    <span className="text-sm font-medium text-slate-900">{clientData.billingEmail}</span>
                     <Button variant="ghost" size="sm" className="h-5 w-5 p-0" onClick={() => handleEdit("billingEmail")}>
                       <Pencil className="h-1.5 w-1.5 text-slate-500" />
                     </Button>
@@ -405,7 +480,7 @@ export default function CreateSubscription() {
                   </div>
                 ) : (
                   <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium text-slate-900">{editingField === "billingCurrency" ? editedData.billingCurrency : clientData.billingCurrency}</span>
+                    <span className="text-sm font-medium text-slate-900">{clientData.billingCurrency}</span>
                     <Button variant="ghost" size="sm" className="h-5 w-5 p-0" onClick={() => handleEdit("billingCurrency")}>
                       <Pencil className="h-1.5 w-1.5 text-slate-500" />
                     </Button>
@@ -445,7 +520,7 @@ export default function CreateSubscription() {
                   </div>
                 ) : (
                   <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium text-slate-900">{editingField === "invoiceCurrencyPreference" ? editedData.invoiceCurrencyPreference : clientData.invoiceCurrencyPreference}</span>
+                    <span className="text-sm font-medium text-slate-900">{clientData.invoiceCurrencyPreference}</span>
                     <Button variant="ghost" size="sm" className="h-5 w-5 p-0" onClick={() => handleEdit("invoiceCurrencyPreference")}>
                       <Pencil className="h-1.5 w-1.5 text-slate-500" />
                     </Button>
@@ -472,7 +547,7 @@ export default function CreateSubscription() {
                   </div>
                 ) : (
                   <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium text-slate-900">{editingField === "billingAddress" ? editedData.billingAddress : clientData.billingAddress}</span>
+                    <span className="text-sm font-medium text-slate-900">{clientData.billingAddress}</span>
                     <Button variant="ghost" size="sm" className="h-5 w-5 p-0" onClick={() => handleEdit("billingAddress")}>
                       <Pencil className="h-1.5 w-1.5 text-slate-500" />
                     </Button>
@@ -528,12 +603,46 @@ export default function CreateSubscription() {
                         <TableCell className="text-slate-900 border-r border-slate-200">{formatSalary(employee.salary)}</TableCell>
                         <TableCell className="text-slate-600 border-r border-slate-200">{formatDate(employee.start_date)}</TableCell>
                         <TableCell>
-                          <div className="flex items-center gap-2">
-                            <span className="text-slate-900">{formatEORFee(employee.individual_eor_fee)}</span>
-                            <Button variant="ghost" size="sm" className="h-5 w-5 p-0">
-                              <Pencil className="h-1.5 w-1.5 text-slate-500" />
-                            </Button>
-                          </div>
+                          {editingEmployeeId === employee.id ? (
+                            <div className="flex items-center gap-1">
+                              <Input
+                                type="number"
+                                step="0.01"
+                                value={editedEorFee}
+                                onChange={(e) => setEditedEorFee(e.target.value)}
+                                className="h-8 w-24 text-sm border-indigo-300 focus:border-indigo-500 focus:ring-indigo-500"
+                                placeholder="0.00"
+                              />
+                              <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                className="h-6 w-6 p-0 text-green-600" 
+                                onClick={() => handleSaveEorFee(employee.id)}
+                              >
+                                <Check className="h-3.5 w-3.5" />
+                              </Button>
+                              <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                className="h-6 w-6 p-0 text-red-600" 
+                                onClick={handleCancelEorFee}
+                              >
+                                <X className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-2">
+                              <span className="text-slate-900">{formatEORFee(employee.individual_eor_fee)}</span>
+                              <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                className="h-5 w-5 p-0" 
+                                onClick={() => handleEditEorFee(employee.id, employee.individual_eor_fee)}
+                              >
+                                <Pencil className="h-1.5 w-1.5 text-slate-500" />
+                              </Button>
+                            </div>
+                          )}
                         </TableCell>
                       </TableRow>
                     ))
@@ -569,11 +678,7 @@ export default function CreateSubscription() {
         <Button
           size="sm"
           className="bg-indigo-600 hover:bg-indigo-700 text-white"
-          onClick={() =>
-            navigate(`/clients/${clientId}/new-subscription/step2`, {
-              state: location.state,
-            })
-          }
+          onClick={handleContinue}
         >
           Continue
         </Button>
