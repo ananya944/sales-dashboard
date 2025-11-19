@@ -85,7 +85,7 @@ export default function Employees() {
     
     const matchesSearch = 
       employeeName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      employee.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (employee.email || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
       employee.job_title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       orgName.toLowerCase().includes(searchQuery.toLowerCase());
     
@@ -332,7 +332,7 @@ export default function Employees() {
                             </div>
                           </TableCell>
                           <TableCell className="py-3 px-6 text-slate-600">
-                            {employee.email}
+                            {employee.email || "-"}
                           </TableCell>
                           <TableCell className="py-3 px-6 text-slate-600">
                             {employee.job_title}

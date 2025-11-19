@@ -240,12 +240,11 @@ export default function CreateSubscriptionStep3() {
 
                 // Create employee data
                 const uniqueId = Math.random().toString(36).substr(2, 9);
-                const emailBase = `${firstName.toLowerCase()}.${lastName.toLowerCase()}`.replace(/\s+/g, '');
                 const employeeData: Partial<Employee> = {
                   employee_id: `EMP-${Date.now()}-${uniqueId}`,
                   first_name: firstName,
                   last_name: lastName,
-                  email: `${emailBase}.${uniqueId}@client.com`, // Generate unique email
+                  email: null,
                   phone: null,
                   job_title: emp.role || "",
                   department: "",
