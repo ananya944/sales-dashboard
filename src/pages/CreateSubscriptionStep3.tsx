@@ -6,12 +6,13 @@ import { X, DollarSign, Plus, CheckCircle, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { createSubscription } from "@/services/subscriptionService";
 import { getOrganizationById, updateOrganization } from "@/services/organizationService";
-import { getEmployeesByOrganization, type Employee } from "@/services/employeeService";
+import { getEmployeesByOrganization, createEmployee, type Employee } from "@/services/employeeService";
 import { getProspectById, updateProspectOnboarding } from "@/services/prospectService";
 import { convertProspectToClient } from "@/services/addClientService";
 
 interface EmployeeWithEORFee extends Employee {
   individual_eor_fee?: number | null;
+  billable?: boolean | null;
 }
 
 interface LineItem {
@@ -101,7 +102,11 @@ export default function CreateSubscriptionStep3() {
         // Try to fetch as client first
         orgData = await getOrganizationById(clientId);
         try {
-          employeesData = await getEmployeesByOrganization(clientId) as EmployeeWithEORFee[];
+          const fetchedEmployees = await getEmployeesByOrganization(clientId) as EmployeeWithEORFee[];
+          employeesData = fetchedEmployees.map((emp) => ({
+            ...emp,
+            billable: emp.billable ?? true,
+          }));
         } catch (empError) {
           employeesData = [];
         }
@@ -124,14 +129,17 @@ export default function CreateSubscriptionStep3() {
       }
 
       const employees = employeesData;
+      const billableEmployees = employees.filter(
+        (emp) => emp.billable !== false
+      );
 
       // Calculate totals from Step 1 (with overrides if Step 1 edits exist)
-      let employeeCount = employees.length;
-      let totalEorFee = employees.reduce((sum, emp) => {
+      let employeeCount = billableEmployees.length;
+      let totalEorFee = billableEmployees.reduce((sum, emp) => {
         const eorFee = emp.individual_eor_fee || 0;
         return sum + (typeof eorFee === "number" ? eorFee : 0);
       }, 0);
-      let totalMonthlyPayroll = employees.reduce((sum, emp) => {
+      let totalMonthlyPayroll = billableEmployees.reduce((sum, emp) => {
         return sum + (emp.salary || 0);
       }, 0);
 
@@ -140,13 +148,16 @@ export default function CreateSubscriptionStep3() {
         try {
           const parsed = JSON.parse(step1EmployeesStr);
           if (Array.isArray(parsed.employees) && parsed.employees.length > 0) {
-            employeeCount = parsed.employees.length;
-            totalEorFee = parsed.employees.reduce(
+            const billableStep1Employees = parsed.employees.filter(
+              (emp: any) => emp.billable !== false
+            );
+            employeeCount = billableStep1Employees.length;
+            totalEorFee = billableStep1Employees.reduce(
               (sum: number, emp: any) => sum + (Number(emp.eorFee) || 0),
               0
             );
-            totalMonthlyPayroll = parsed.employees.reduce(
-              (sum: number, emp: any) => sum + (Number(emp.salaryInr) || 0),
+            totalMonthlyPayroll = billableStep1Employees.reduce(
+              (sum: number, emp: any) => sum + (Number(emp.salaryInr ?? emp.salary) || 0),
               0
             );
           }
@@ -193,6 +204,87 @@ export default function CreateSubscriptionStep3() {
 
       // Save to Supabase
       await createSubscription(subscriptionData);
+
+      // Update existing employees and create new employees from Step 1
+      if (step1EmployeesStr) {
+        try {
+          const parsed = JSON.parse(step1EmployeesStr);
+          const actualClientIdFromStep1 = parsed.actualClientId || actualClientId;
+          
+          if (Array.isArray(parsed.employees)) {
+            // Separate existing and new employees
+            const existingEmployees = parsed.employees.filter((emp: any) => !emp.isNew && emp.id && !emp.id.startsWith('temp-'));
+            const newEmployees = parsed.employees.filter((emp: any) => emp.isNew === true || emp.id?.startsWith('temp-'));
+            
+            // Update existing employees' billable and individual_eor_fee
+            for (const emp of existingEmployees) {
+              try {
+                await updateEmployee(emp.id, {
+                  billable: emp.billable !== false, // Ensure boolean
+                  individual_eor_fee: typeof emp.eorFee === "number" ? emp.eorFee : 0,
+                } as any);
+                console.log(`✅ Updated existing employee: ${emp.name} (billable: ${emp.billable}, eorFee: ${emp.eorFee})`);
+              } catch (empError) {
+                console.error(`❌ Error updating employee ${emp.name}:`, empError);
+                // Continue with other employees even if one fails
+              }
+            }
+            
+            // Create new employees
+            for (const emp of newEmployees) {
+              try {
+                // Parse name to first_name and last_name
+                const nameParts = emp.name.trim().split(" ");
+                const firstName = nameParts[0] || "";
+                const lastName = nameParts.slice(1).join(" ") || "";
+
+                // Create employee data
+                const uniqueId = Math.random().toString(36).substr(2, 9);
+                const emailBase = `${firstName.toLowerCase()}.${lastName.toLowerCase()}`.replace(/\s+/g, '');
+                const employeeData: Partial<Employee> = {
+                  employee_id: `EMP-${Date.now()}-${uniqueId}`,
+                  first_name: firstName,
+                  last_name: lastName,
+                  email: `${emailBase}.${uniqueId}@client.com`, // Generate unique email
+                  phone: null,
+                  job_title: emp.role || "",
+                  department: "",
+                  employment_type: "full-time",
+                  salary: emp.salaryInr || 0,
+                  start_date: emp.startDate || new Date().toISOString().split('T')[0],
+                  status: "Active",
+                  organization_id: actualClientIdFromStep1,
+                  currency: "INR",
+                  seniority: null,
+                  work_location: null,
+                  billable: emp.billable !== false, // Include billable status
+                };
+
+                const createdEmployee = await createEmployee(employeeData);
+                
+                // Update individual_eor_fee after creation (if the field exists)
+                if (createdEmployee.id && typeof emp.eorFee === "number") {
+                  try {
+                    await updateEmployee(createdEmployee.id, {
+                      individual_eor_fee: emp.eorFee,
+                    } as any);
+                  } catch (eorFeeError) {
+                    console.warn(`⚠️ Could not set EOR fee for ${emp.name}:`, eorFeeError);
+                  }
+                }
+                
+                console.log(`✅ Created new employee: ${emp.name} (billable: ${emp.billable}, eorFee: ${emp.eorFee})`);
+              } catch (empError) {
+                console.error(`❌ Error creating employee ${emp.name}:`, empError);
+                // Continue with other employees even if one fails
+              }
+            }
+          }
+        } catch (error) {
+          console.error("Error processing employees:", error);
+          // Don't fail the whole operation if employee update/creation fails
+        }
+      }
 
       // Update organization's MRR with the calculated monthly EOR fee
       try {

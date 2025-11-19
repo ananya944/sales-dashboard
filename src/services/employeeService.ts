@@ -17,6 +17,7 @@ export interface Employee {
   currency: string | null;
   seniority: string | null;
   work_location: string | null;
+  billable?: boolean | null;
 }
 
 export const getEmployeesByOrganization = async (organizationId: string): Promise<Employee[]> => {
@@ -98,6 +99,34 @@ export const getEmployeeById = async (employeeId: string): Promise<Employee> => 
     return data as Employee;
   } catch (error) {
     console.error('Error fetching employee:', error);
+    throw error;
+  }
+};
+
+export const createEmployee = async (employeeData: Partial<Employee>): Promise<Employee> => {
+  try {
+    console.log('Creating new employee:', employeeData);
+    
+    const { data, error } = await supabase
+      .from('employees')
+      .insert([employeeData])
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Supabase error creating employee:', {
+        code: error.code,
+        message: error.message,
+        details: error.details,
+        hint: error.hint
+      });
+      throw error;
+    }
+
+    console.log('Employee created successfully:', data);
+    return data as Employee;
+  } catch (error) {
+    console.error('Error creating employee:', error);
     throw error;
   }
 };

@@ -386,7 +386,7 @@ export default function Prospects() {
                                   <span>Add Note</span>
                                 </div>
                               </DropdownMenuItem>
-                              {(stageFilter === "MSA Signed" || stageFilter === "Employee Added") && (
+                              {(prospect.productUsage === "MSA Signed" || prospect.productUsage === "Employee Added") && (
                                 <DropdownMenuItem
                                   onClick={(e) => {
                                     e.stopPropagation();

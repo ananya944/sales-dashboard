@@ -4,13 +4,18 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { X, Pencil, Users, Check, ChevronDown } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
+import { X, Pencil, Users, Check, ChevronDown, Plus, Calendar } from "lucide-react";
+import { format } from "date-fns";
 import { getOrganizationById } from "@/services/organizationService";
 import { getEmployeesByOrganization, type Employee } from "@/services/employeeService";
 import { getProspectById } from "@/services/prospectService";
 
 interface EmployeeWithEORFee extends Employee {
   individual_eor_fee?: number | null;
+  isNew?: boolean; // Flag to identify newly created employees
+  billable?: boolean; // Billable status for subscription
 }
 
 export default function CreateSubscription() {
@@ -44,6 +49,38 @@ export default function CreateSubscription() {
     billingAddress: "",
   });
   const [editedEorFee, setEditedEorFee] = useState<string>("");
+  const [showAddEmployeeForm, setShowAddEmployeeForm] = useState(false);
+  const [newEmployeeForm, setNewEmployeeForm] = useState({
+    name: "",
+    role: "",
+    monthlySalary: "",
+    startDate: undefined as Date | undefined,
+    eorFee: "",
+  });
+  const [actualClientId, setActualClientId] = useState<string | null>(null);
+
+  const getStoredEmployees = (fallbackEmployees: EmployeeWithEORFee[]) => {
+    if (!clientId) return fallbackEmployees;
+
+    try {
+      const stored = localStorage.getItem(`subscription_step1_${clientId}`);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+
+        if (parsed.actualClientId) {
+          setActualClientId(parsed.actualClientId);
+        }
+
+        if (Array.isArray(parsed.fullEmployees) && parsed.fullEmployees.length > 0) {
+          return parsed.fullEmployees as EmployeeWithEORFee[];
+        }
+      }
+    } catch (error) {
+      console.error("Error loading stored employees:", error);
+    }
+
+    return fallbackEmployees;
+  };
 
   // Fetch client and employee data on page load
   useEffect(() => {
@@ -132,19 +169,27 @@ export default function CreateSubscription() {
           billingAddress: billingAddress || "",
         });
 
+        // Store actual client ID (will be set when prospect is converted)
+        setActualClientId(isProspectMode ? null : clientId);
+
         // Fetch employees from employees table (only if it's a client, not a prospect)
+        let fetchedEmployees: EmployeeWithEORFee[] = [];
         if (!isProspectMode) {
           try {
             const employeesData = await getEmployeesByOrganization(clientId);
-            setEmployees(employeesData as EmployeeWithEORFee[]);
+            // Ensure billable is set (default to true if null/undefined)
+            fetchedEmployees = employeesData.map(emp => ({
+              ...emp,
+              billable: emp.billable ?? true,
+            })) as EmployeeWithEORFee[];
           } catch (empError) {
-            // No employees found, set empty array
-            setEmployees([]);
+            // No employees found, keep empty array
+            fetchedEmployees = [];
           }
-        } else {
-          // For prospects, no employees yet
-          setEmployees([]);
         }
+
+        const hydratedEmployees = getStoredEmployees(fetchedEmployees);
+        setEmployees(hydratedEmployees);
       } catch (err) {
         console.error("Error loading data:", err);
         setError(err instanceof Error ? err.message : "Failed to load data");
@@ -221,6 +266,81 @@ export default function CreateSubscription() {
     setEditedEorFee("");
   };
 
+  const handleAddEmployee = () => {
+    // Validate required fields
+    if (!newEmployeeForm.name.trim() || !newEmployeeForm.role.trim() || 
+        !newEmployeeForm.monthlySalary.trim() || !newEmployeeForm.startDate || 
+        !newEmployeeForm.eorFee.trim()) {
+      alert("Please fill in all required fields");
+      return;
+    }
+
+    // Create a temporary employee object
+    const nameParts = newEmployeeForm.name.trim().split(" ");
+    const firstName = nameParts[0] || "";
+    const lastName = nameParts.slice(1).join(" ") || "";
+
+    const newEmployee: EmployeeWithEORFee = {
+      id: `temp-${Date.now()}-${Math.random()}`, // Temporary ID
+      employee_id: `TEMP-${Date.now()}`,
+      first_name: firstName,
+      last_name: lastName,
+      email: "", // Will be set when saved
+      phone: null,
+      job_title: newEmployeeForm.role.trim(),
+      department: "",
+      employment_type: "full-time",
+      salary: parseFloat(newEmployeeForm.monthlySalary) || 0,
+      start_date: format(newEmployeeForm.startDate, "yyyy-MM-dd"),
+      status: "Active",
+      organization_id: actualClientId || clientId || "",
+      currency: "INR",
+      seniority: null,
+      work_location: null,
+      individual_eor_fee: parseFloat(newEmployeeForm.eorFee) || 0,
+      isNew: true, // Mark as new employee
+      billable: true, // New employees default to billable
+    };
+
+    // Add to employees list
+    setEmployees((prev) => [...prev, newEmployee]);
+
+    // Reset form
+    setNewEmployeeForm({
+      name: "",
+      role: "",
+      monthlySalary: "",
+      startDate: undefined,
+      eorFee: "",
+    });
+    setShowAddEmployeeForm(false);
+  };
+
+  const handleCancelAddEmployee = () => {
+    setNewEmployeeForm({
+      name: "",
+      role: "",
+      monthlySalary: "",
+      startDate: undefined,
+      eorFee: "",
+    });
+    setShowAddEmployeeForm(false);
+  };
+
+  const handleRemoveNewEmployee = (employeeId: string) => {
+    setEmployees((prev) => prev.filter((emp) => emp.id !== employeeId));
+  };
+
+  const handleToggleBillable = (employeeId: string) => {
+    setEmployees((prev) =>
+      prev.map((emp) =>
+        emp.id === employeeId
+          ? { ...emp, billable: !emp.billable }
+          : emp
+      )
+    );
+  };
+
   const handleContinue = () => {
     if (!clientId) return;
 
@@ -231,15 +351,21 @@ export default function CreateSubscription() {
       salaryInr: emp.salary || 0,
       startDate: emp.start_date || null,
       eorFee: typeof emp.individual_eor_fee === "number" ? emp.individual_eor_fee : 0,
+      isNew: emp.isNew || false, // Include flag for Step 3
+      billable: emp.billable !== false, // Include billable status (default to true)
     }));
+
+    const billableEmployeeCount = employeeSummary.filter(emp => emp.billable !== false).length;
 
     const step1Data = {
       employees: employeeSummary,
       totals: {
-        employeeCount: employeeSummary.length,
+        employeeCount: billableEmployeeCount,
         monthlyPayrollInr: totalMonthlyPayroll,
         monthlyEorFeeUsd: totalEorFee,
       },
+      actualClientId: actualClientId || clientId, // Store actual client ID
+      fullEmployees: employees,
     };
 
     localStorage.setItem(`subscription_step1_${clientId}`, JSON.stringify(step1Data));
@@ -253,14 +379,20 @@ export default function CreateSubscription() {
     setEditedData(prev => ({ ...prev, [field]: value }));
   };
 
-  // Calculate totals
+  // Calculate totals - only include billable employees
   const totalEorFee = employees.reduce((sum, emp) => {
-    const eorFee = emp.individual_eor_fee || 0;
-    return sum + (typeof eorFee === 'number' ? eorFee : 0);
+    if (emp.billable !== false) { // Include if billable is true or null/undefined (default to true)
+      const eorFee = emp.individual_eor_fee || 0;
+      return sum + (typeof eorFee === 'number' ? eorFee : 0);
+    }
+    return sum;
   }, 0);
 
   const totalMonthlyPayroll = employees.reduce((sum, emp) => {
-    return sum + (emp.salary || 0);
+    if (emp.billable !== false) {
+      return sum + (emp.salary || 0);
+    }
+    return sum;
   }, 0);
 
   // Format date for display
@@ -570,10 +702,126 @@ export default function CreateSubscription() {
                 <Users className="h-5 w-5 text-slate-500" />
                 <h3 className="text-base font-semibold text-slate-900">Employees</h3>
               </div>
-              <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-700">
-                Total: {employees.length} employees
-              </span>
+              <div className="flex items-center gap-3">
+                <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-700">
+                  Total: {employees.length} employees
+                </span>
+                {employees.length === 0 && !showAddEmployeeForm && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 px-3 text-xs"
+                    onClick={() => setShowAddEmployeeForm(true)}
+                  >
+                    <Plus className="h-3.5 w-3.5 mr-1.5" />
+                    Add Employee
+                  </Button>
+                )}
+              </div>
             </div>
+
+            {/* Add Employee Form */}
+            {showAddEmployeeForm && (
+              <div className="mb-4 p-4 bg-slate-50 rounded-lg border border-slate-200">
+                <h4 className="text-sm font-semibold text-slate-900 mb-3">Add New Employee</h4>
+                <div className="grid grid-cols-5 gap-3">
+                  <div>
+                    <label className="text-xs text-slate-500 mb-1 block">Employee Name *</label>
+                    <Input
+                      value={newEmployeeForm.name}
+                      onChange={(e) => setNewEmployeeForm(prev => ({ ...prev, name: e.target.value }))}
+                      placeholder="John Doe"
+                      className="h-8 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-slate-500 mb-1 block">Role/Job Title *</label>
+                    <Input
+                      value={newEmployeeForm.role}
+                      onChange={(e) => setNewEmployeeForm(prev => ({ ...prev, role: e.target.value }))}
+                      placeholder="Software Engineer"
+                      className="h-8 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-slate-500 mb-1 block">Monthly Salary (INR) *</label>
+                    <Input
+                      type="number"
+                      value={newEmployeeForm.monthlySalary}
+                      onChange={(e) => setNewEmployeeForm(prev => ({ ...prev, monthlySalary: e.target.value }))}
+                      placeholder="50000"
+                      className="h-8 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-slate-500 mb-1 block">Start Date *</label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-8 w-full text-sm justify-start text-left font-normal"
+                        >
+                          <Calendar className="mr-2 h-3.5 w-3.5" />
+                          {newEmployeeForm.startDate ? format(newEmployeeForm.startDate, "dd/MM/yyyy") : "Select date"}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <CalendarComponent
+                          mode="single"
+                          selected={newEmployeeForm.startDate}
+                          onSelect={(date) => setNewEmployeeForm(prev => ({ ...prev, startDate: date }))}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                  <div>
+                    <label className="text-xs text-slate-500 mb-1 block">Individual EOR Fee (USD) *</label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      value={newEmployeeForm.eorFee}
+                      onChange={(e) => setNewEmployeeForm(prev => ({ ...prev, eorFee: e.target.value }))}
+                      placeholder="50.00"
+                      className="h-8 text-sm"
+                    />
+                  </div>
+                </div>
+                <div className="flex justify-end gap-2 mt-3">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 px-3 text-xs"
+                    onClick={handleCancelAddEmployee}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    size="sm"
+                    className="h-8 px-3 text-xs bg-indigo-600 hover:bg-indigo-700 text-white"
+                    onClick={handleAddEmployee}
+                  >
+                    Save Employee
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* Add Employee Button (when employees exist) */}
+            {employees.length > 0 && !showAddEmployeeForm && (
+              <div className="mb-3">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 px-3 text-xs"
+                  onClick={() => setShowAddEmployeeForm(true)}
+                >
+                  <Plus className="h-3.5 w-3.5 mr-1.5" />
+                  Add Employee
+                </Button>
+              </div>
+            )}
 
             <div className="overflow-x-auto border border-slate-200 rounded-lg">
               <Table>
@@ -583,77 +831,108 @@ export default function CreateSubscription() {
                     <TableHead className="text-left border-r border-slate-200">Role</TableHead>
                     <TableHead className="text-left border-r border-slate-200">Monthly Salary (INR)</TableHead>
                     <TableHead className="text-left border-r border-slate-200">Start Date</TableHead>
-                    <TableHead className="text-left">EOR Fee</TableHead>
+                    <TableHead className="text-left border-r border-slate-200">EOR Fee</TableHead>
+                    <TableHead className="text-left border-r border-slate-200">Billable</TableHead>
+                    {employees.some(emp => emp.id.startsWith('temp-')) && (
+                      <TableHead className="text-left w-20">Actions</TableHead>
+                    )}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {employees.length === 0 ? (
+                  {employees.length === 0 && !showAddEmployeeForm ? (
                     <TableRow>
-                      <TableCell colSpan={5} className="text-center text-slate-500 py-8">
+                      <TableCell colSpan={7} className="text-center text-slate-500 py-8">
                         No employees found for this client
                       </TableCell>
                     </TableRow>
                   ) : (
-                    employees.map((employee) => (
-                      <TableRow key={employee.id}>
-                        <TableCell className="font-medium text-slate-900 border-r border-slate-200">
-                          {`${employee.first_name} ${employee.last_name}`.trim() || "-"}
-                        </TableCell>
-                        <TableCell className="text-slate-600 border-r border-slate-200">{employee.job_title || "-"}</TableCell>
-                        <TableCell className="text-slate-900 border-r border-slate-200">{formatSalary(employee.salary)}</TableCell>
-                        <TableCell className="text-slate-600 border-r border-slate-200">{formatDate(employee.start_date)}</TableCell>
-                        <TableCell>
-                          {editingEmployeeId === employee.id ? (
-                            <div className="flex items-center gap-1">
-                              <Input
-                                type="number"
-                                step="0.01"
-                                value={editedEorFee}
-                                onChange={(e) => setEditedEorFee(e.target.value)}
-                                className="h-8 w-24 text-sm border-indigo-300 focus:border-indigo-500 focus:ring-indigo-500"
-                                placeholder="0.00"
+                    employees.map((employee) => {
+                      const isNewEmployee = employee.id.startsWith('temp-');
+                      return (
+                        <TableRow key={employee.id}>
+                          <TableCell className="font-medium text-slate-900 border-r border-slate-200">
+                            {`${employee.first_name} ${employee.last_name}`.trim() || "-"}
+                          </TableCell>
+                          <TableCell className="text-slate-600 border-r border-slate-200">{employee.job_title || "-"}</TableCell>
+                          <TableCell className="text-slate-900 border-r border-slate-200">{formatSalary(employee.salary)}</TableCell>
+                          <TableCell className="text-slate-600 border-r border-slate-200">{formatDate(employee.start_date)}</TableCell>
+                          <TableCell className="border-r border-slate-200">
+                            {editingEmployeeId === employee.id ? (
+                              <div className="flex items-center gap-1">
+                                <Input
+                                  type="number"
+                                  step="0.01"
+                                  value={editedEorFee}
+                                  onChange={(e) => setEditedEorFee(e.target.value)}
+                                  className="h-8 w-24 text-sm border-indigo-300 focus:border-indigo-500 focus:ring-indigo-500"
+                                  placeholder="0.00"
+                                />
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm" 
+                                  className="h-6 w-6 p-0 text-green-600" 
+                                  onClick={() => handleSaveEorFee(employee.id)}
+                                >
+                                  <Check className="h-3.5 w-3.5" />
+                                </Button>
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm" 
+                                  className="h-6 w-6 p-0 text-red-600" 
+                                  onClick={handleCancelEorFee}
+                                >
+                                  <X className="h-3.5 w-3.5" />
+                                </Button>
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-2">
+                                <span className="text-slate-900">{formatEORFee(employee.individual_eor_fee)}</span>
+                                {!isNewEmployee && (
+                                  <Button 
+                                    variant="ghost" 
+                                    size="sm" 
+                                    className="h-5 w-5 p-0" 
+                                    onClick={() => handleEditEorFee(employee.id, employee.individual_eor_fee)}
+                                  >
+                                    <Pencil className="h-1.5 w-1.5 text-slate-500" />
+                                  </Button>
+                                )}
+                              </div>
+                            )}
+                          </TableCell>
+                          <TableCell className={isNewEmployee ? "border-r border-slate-200" : ""}>
+                            <div className="flex items-center">
+                              <input
+                                type="checkbox"
+                                checked={employee.billable !== false}
+                                onChange={() => handleToggleBillable(employee.id)}
+                                className="h-4 w-4 rounded border-slate-300 accent-indigo-600 focus:ring-indigo-500"
                               />
-                              <Button 
-                                variant="ghost" 
-                                size="sm" 
-                                className="h-6 w-6 p-0 text-green-600" 
-                                onClick={() => handleSaveEorFee(employee.id)}
-                              >
-                                <Check className="h-3.5 w-3.5" />
-                              </Button>
-                              <Button 
-                                variant="ghost" 
-                                size="sm" 
-                                className="h-6 w-6 p-0 text-red-600" 
-                                onClick={handleCancelEorFee}
-                              >
-                                <X className="h-3.5 w-3.5" />
-                              </Button>
                             </div>
-                          ) : (
-                            <div className="flex items-center gap-2">
-                              <span className="text-slate-900">{formatEORFee(employee.individual_eor_fee)}</span>
-                              <Button 
-                                variant="ghost" 
-                                size="sm" 
-                                className="h-5 w-5 p-0" 
-                                onClick={() => handleEditEorFee(employee.id, employee.individual_eor_fee)}
+                          </TableCell>
+                          {isNewEmployee && (
+                            <TableCell>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 w-7 p-0 text-red-600 hover:text-red-700"
+                                onClick={() => handleRemoveNewEmployee(employee.id)}
                               >
-                                <Pencil className="h-1.5 w-1.5 text-slate-500" />
+                                <X className="h-4 w-4" />
                               </Button>
-                            </div>
+                            </TableCell>
                           )}
-                        </TableCell>
-                      </TableRow>
-                    ))
+                        </TableRow>
+                      );
+                    })
                   )}
                   {/* Total Row */}
                   {employees.length > 0 && (
                     <TableRow className="bg-slate-50">
-                      <TableCell colSpan={4} className="text-right font-semibold text-slate-900">
+                      <TableCell colSpan={employees.some(emp => emp.id.startsWith('temp-')) ? 5 : 5} className="text-right font-semibold text-slate-900">
                         Total EOR Fee:
                       </TableCell>
-                      <TableCell className="font-semibold text-slate-900">
+                      <TableCell className="font-semibold text-slate-900" colSpan={employees.some(emp => emp.id.startsWith('temp-')) ? 3 : 2}>
                         ${totalEorFee.toFixed(2)}
                       </TableCell>
                     </TableRow>

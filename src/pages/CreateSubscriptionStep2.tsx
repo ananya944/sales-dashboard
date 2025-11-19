@@ -41,6 +41,7 @@ interface EmployeeSummary {
   salaryInr: number;
   startDate?: string | null;
   eorFee: number;
+  billable?: boolean;
 }
 
 // Form state
@@ -89,21 +90,18 @@ interface EmployeeSummary {
         const parsed = JSON.parse(stored);
         if (Array.isArray(parsed.employees)) {
           setEmployeeSummary(parsed.employees);
-        }
-        if (parsed.totals) {
+
+          const billableEmployees = parsed.employees.filter(
+            (emp: EmployeeSummary) => emp.billable !== false
+          );
+
           setSummaryTotals({
-            employeeCount: parsed.totals.employeeCount || parsed.employees?.length || 0,
-            monthlyPayrollInr: parsed.totals.monthlyPayrollInr || 0,
-            monthlyEorFeeUsd: parsed.totals.monthlyEorFeeUsd || 0,
-          });
-        } else if (Array.isArray(parsed.employees)) {
-          setSummaryTotals({
-            employeeCount: parsed.employees.length,
-            monthlyPayrollInr: parsed.employees.reduce(
+            employeeCount: billableEmployees.length,
+            monthlyPayrollInr: billableEmployees.reduce(
               (sum: number, emp: EmployeeSummary) => sum + (emp.salaryInr || 0),
               0
             ),
-            monthlyEorFeeUsd: parsed.employees.reduce(
+            monthlyEorFeeUsd: billableEmployees.reduce(
               (sum: number, emp: EmployeeSummary) => sum + (emp.eorFee || 0),
               0
             ),
@@ -168,6 +166,10 @@ interface EmployeeSummary {
       state: location.state,
     });
   };
+
+  const billableEmployees = employeeSummary.filter(
+    (employee) => employee.billable !== false
+  );
 
   return (
     <div className="mx-auto max-w-5xl px-6">
@@ -396,9 +398,9 @@ interface EmployeeSummary {
                       <div>CTC (USD)</div>
                       <div>EOR FEE (USD)</div>
                     </div>
-                    {employeeSummary.length > 0 ? (
+                    {billableEmployees.length > 0 ? (
                       <>
-                        {employeeSummary.map((employee) => (
+                        {billableEmployees.map((employee) => (
                           <div
                             key={employee.id}
                             className="grid grid-cols-5 px-4 py-3 text-sm border-b border-indigo-100"
@@ -429,7 +431,7 @@ interface EmployeeSummary {
                       </>
                     ) : (
                       <div className="px-4 py-6 text-sm text-slate-600">
-                        No employee data available. Please go back to Step 1 to review employee information.
+                        No billable employee data available. Please go back to Step 1 to review employee information.
                       </div>
                     )}
                   </div>
