@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import { useMemo } from "react";
 import type { ExtendedClient } from "@/types/client";
 import { UserRound, FileText, Building2, ShieldCheck, FileSignature, Users, Check, CheckCircle, MapPin, Mail, CreditCard, Folder, ExternalLink, Copy } from "lucide-react";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";

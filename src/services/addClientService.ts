@@ -1,6 +1,6 @@
 import { supabase } from "@/lib/supabase";
 import type { CreateOrganizationInput } from "@/types/organization";
-import { getProspectById, type Prospect } from "@/services/prospectService";
+import { getProspectById } from "@/services/prospectService";
 
 export async function addClient(organization: CreateOrganizationInput) {
   const payload = {

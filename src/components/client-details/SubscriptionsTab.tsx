@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import type { ExtendedClient } from "@/types/client";
 import { Button } from "@/components/ui/button";

@@ -1,11 +1,10 @@
-import React from "react";
 import type { ExtendedClient } from "@/types/client";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { FileText, Plus, Eye, Download, AlertCircle } from "lucide-react";
 
 export function InvoicesTab({ client }: { client: ExtendedClient }) {
-  const invoices = [
+  const defaultInvoices = [
     {
       invoiceNumber: "INV-TECH-001",
       issueDate: "01/01/2024",
@@ -28,12 +27,31 @@ export function InvoicesTab({ client }: { client: ExtendedClient }) {
     },
   ];
 
+  const invoices = (client.invoices && client.invoices.length > 0)
+    ? client.invoices.map((invoice) => {
+        const invoiceAny = invoice as any;
+        return {
+          invoiceNumber: invoice.id || "INV-UNK",
+          issueDate: invoiceAny.issueDate || "-",
+          dueDate: invoiceAny.dueDate || "-",
+          amount: typeof invoice.amount === "number" ? `USD ${invoice.amount.toLocaleString("en-US")}` : "-",
+          tax: typeof invoiceAny.tax === "number" ? `USD ${invoiceAny.tax.toLocaleString("en-US")}` : "-",
+          total: typeof invoice.amount === "number" ? `USD ${invoice.amount.toLocaleString("en-US")}` : "-",
+          status: invoice.status || "sent",
+          isOverdue: invoice.status === "overdue",
+        };
+      })
+    : defaultInvoices;
+
+  const invoiceCount = client.invoices?.length ?? invoices.length;
+
   return (
     <div className="rounded-lg border border-slate-200 bg-white shadow-sm">
       <div className="flex items-center justify-between px-6 pt-4 pb-4 mb-4">
         <div className="flex items-center gap-2">
           <FileText className="h-5 w-5 text-indigo-600" />
           <h3 className="text-xl font-semibold">Invoice History</h3>
+          <span className="text-sm text-slate-500">({invoiceCount} total)</span>
         </div>
         <Button className="bg-indigo-600 hover:bg-indigo-700 text-white">
           <Plus className="h-4 w-4 mr-2" />

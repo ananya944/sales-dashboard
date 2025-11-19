@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -6,7 +6,7 @@ import { X, DollarSign, Plus, CheckCircle, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { createSubscription } from "@/services/subscriptionService";
 import { getOrganizationById, updateOrganization } from "@/services/organizationService";
-import { getEmployeesByOrganization, createEmployee, type Employee } from "@/services/employeeService";
+import { getEmployeesByOrganization, createEmployee, updateEmployee, type Employee } from "@/services/employeeService";
 import { getProspectById, updateProspectOnboarding } from "@/services/prospectService";
 import { convertProspectToClient } from "@/services/addClientService";
 

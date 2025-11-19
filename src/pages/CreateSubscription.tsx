@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -37,7 +37,6 @@ export default function CreateSubscription() {
   const [error, setError] = useState<string | null>(null);
   const [clientData, setClientData] = useState<any>(null);
   const [employees, setEmployees] = useState<EmployeeWithEORFee[]>([]);
-  const [isProspect, setIsProspect] = useState(false);
   const [editingField, setEditingField] = useState<string | null>(null);
   const [editingEmployeeId, setEditingEmployeeId] = useState<string | null>(null);
   const [editedData, setEditedData] = useState({
@@ -102,7 +101,6 @@ export default function CreateSubscription() {
 
         try {
           orgData = await getOrganizationById(clientId);
-          setIsProspect(false);
         } catch (orgError) {
           // If not found in organizations, try as prospect
           console.log("Not found in organizations, checking if prospect...");
@@ -110,7 +108,6 @@ export default function CreateSubscription() {
             prospectData = await getProspectById(clientId);
             if (prospectData) {
               isProspectMode = true;
-              setIsProspect(true);
               
               // Create orgData structure from prospect
               orgData = {
@@ -225,7 +222,7 @@ export default function CreateSubscription() {
     setEditingField(null);
   };
 
-  const handleCancel = (field: string) => {
+  const handleCancel = () => {
     setEditingField(null);
     // Reset to original value
     if (clientData) {
@@ -522,7 +519,7 @@ export default function CreateSubscription() {
                     <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-green-600" onClick={() => handleSave("legalName")}>
                       <Check className="h-3.5 w-3.5" />
                     </Button>
-                    <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-red-600" onClick={() => handleCancel("legalName")}>
+                    <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-red-600" onClick={handleCancel}>
                       <X className="h-3.5 w-3.5" />
                     </Button>
                   </div>
@@ -549,7 +546,7 @@ export default function CreateSubscription() {
                     <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-green-600" onClick={() => handleSave("clientId")}>
                       <Check className="h-3.5 w-3.5" />
                     </Button>
-                    <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-red-600" onClick={() => handleCancel("clientId")}>
+                    <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-red-600" onClick={handleCancel}>
                       <X className="h-3.5 w-3.5" />
                     </Button>
                     <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-slate-600">
@@ -579,7 +576,7 @@ export default function CreateSubscription() {
                     <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-green-600" onClick={() => handleSave("billingEmail")}>
                       <Check className="h-3.5 w-3.5" />
                     </Button>
-                    <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-red-600" onClick={() => handleCancel("billingEmail")}>
+                    <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-red-600" onClick={handleCancel}>
                       <X className="h-3.5 w-3.5" />
                     </Button>
                   </div>
@@ -606,7 +603,7 @@ export default function CreateSubscription() {
                     <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-green-600" onClick={() => handleSave("billingCurrency")}>
                       <Check className="h-3.5 w-3.5" />
                     </Button>
-                    <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-red-600" onClick={() => handleCancel("billingCurrency")}>
+                    <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-red-600" onClick={handleCancel}>
                       <X className="h-3.5 w-3.5" />
                     </Button>
                   </div>
@@ -646,7 +643,7 @@ export default function CreateSubscription() {
                     <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-green-600" onClick={() => handleSave("invoiceCurrencyPreference")}>
                       <Check className="h-3.5 w-3.5" />
                     </Button>
-                    <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-red-600" onClick={() => handleCancel("invoiceCurrencyPreference")}>
+                    <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-red-600" onClick={handleCancel}>
                       <X className="h-3.5 w-3.5" />
                     </Button>
                   </div>
@@ -673,7 +670,7 @@ export default function CreateSubscription() {
                     <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-green-600" onClick={() => handleSave("billingAddress")}>
                       <Check className="h-3.5 w-3.5" />
                     </Button>
-                    <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-red-600" onClick={() => handleCancel("billingAddress")}>
+                    <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-red-600" onClick={handleCancel}>
                       <X className="h-3.5 w-3.5" />
                     </Button>
                   </div>
