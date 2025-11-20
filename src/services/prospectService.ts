@@ -20,6 +20,8 @@ export interface Prospect {
     name: string;
     employee_count: string | number | null;
     phone: string | null;
+    website: string | null;
+    industry: string | null;
     business_address: string | null;
     business_city: string | null;
     business_state: string | null;
@@ -178,6 +180,8 @@ export async function getProspectById(id: string): Promise<Prospect | null> {
           name,
           employee_count,
           phone,
+          website,
+          industry,
           business_address,
           business_city,
           business_state,
@@ -210,7 +214,7 @@ export async function getProspectById(id: string): Promise<Prospect | null> {
       try {
         const { data: orgData, error: orgError } = await supabase
           .from('organizations')
-          .select('id, name, employee_count, phone, business_address, business_city, business_state, business_postal_code')
+          .select('id, name, employee_count, phone, website, industry, business_address, business_city, business_state, business_postal_code')
           .eq('id', normalized.organization_id)
           .single()
 

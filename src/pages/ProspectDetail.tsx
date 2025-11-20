@@ -5,7 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Building, Mail, Phone, MapPin, Calendar, Clock, Users, Check, CalendarDays, UserPlus } from "lucide-react";
+import { Building, Mail, Phone, MapPin, Calendar, Clock, Users, Check, CalendarDays, UserPlus, FileText, Briefcase, Globe } from "lucide-react";
 import { getProspectById, type Prospect } from "@/services/prospectService";
 import { format } from "date-fns";
 
@@ -79,12 +79,23 @@ export default function ProspectDetail() {
     .filter(Boolean)
     .join(" ") || prospect.email.split("@")[0] || "Unknown User";
 
-  const companyName = prospect.organization?.name || "No Company";
+  const companyName = prospect.organization?.name || "Not provided";
   const contactPhone = prospect.phone || prospect.organization?.phone || "Not provided";
   const rawEmployeeCount = prospect.organization?.employee_count;
-  const companySize = rawEmployeeCount != null && rawEmployeeCount !== ""
-    ? `${rawEmployeeCount} ${String(rawEmployeeCount).toLowerCase().includes("employee") ? "" : "employees"}`.trim()
-    : "Not available";
+  
+  // Format company size to match design (e.g., "50-100 employees")
+  const formatCompanySize = (count: string | number | null): string => {
+    if (count == null || count === "") return "Not provided";
+    const countStr = String(count);
+    // If it already contains a range or "employees", return as is
+    if (countStr.includes("-") || countStr.toLowerCase().includes("employee")) {
+      return countStr;
+    }
+    // Otherwise, format as "X employees"
+    return `${countStr} employees`;
+  };
+  
+  const companySize = formatCompanySize(rawEmployeeCount);
 
   const organizationLocation = prospect.organization
     ? [
@@ -97,7 +108,12 @@ export default function ProspectDetail() {
         .join(", ")
     : "";
 
-  const formattedAddress = organizationLocation || "Location not available";
+  const formattedAddress = organizationLocation || "Not provided";
+  const companyWebsite = prospect.organization?.website || null;
+  const companyIndustry = prospect.organization?.industry || null;
+  
+  // Format address for contact details (same as organization location)
+  const contactAddress = formattedAddress;
 
   const timelineEvents = (() => {
     type TimelineEvent = {
@@ -396,7 +412,7 @@ export default function ProspectDetail() {
             <Card className="border-slate-200">
               <CardHeader className="pb-4">
                 <div className="flex items-center gap-2 text-slate-900">
-                  <Building className="h-5 w-5" />
+                  <FileText className="h-5 w-5" />
                   <CardTitle className="text-xl font-semibold">Company Information</CardTitle>
                 </div>
               </CardHeader>
@@ -407,16 +423,30 @@ export default function ProspectDetail() {
                     <dd className="text-sm font-medium text-slate-900">{companyName}</dd>
                   </div>
                   <div>
+                    <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">Industry</dt>
+                    <dd className="text-sm text-slate-900">{companyIndustry || "Not provided"}</dd>
+                  </div>
+                  <div>
                     <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">Company Size</dt>
                     <dd className="text-sm text-slate-900">{companySize}</dd>
                   </div>
                   <div>
-                    <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">Company Phone</dt>
-                    <dd className="text-sm text-slate-900">{prospect.organization?.phone || "Not provided"}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">Location</dt>
-                    <dd className="text-sm text-slate-900">{formattedAddress}</dd>
+                    <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">Website</dt>
+                    <dd className="text-sm text-slate-900">
+                      {companyWebsite ? (
+                        <a 
+                          href={companyWebsite.startsWith("http") ? companyWebsite : `https://${companyWebsite}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-600 hover:text-blue-700 flex items-center gap-1"
+                        >
+                          <Globe className="h-3.5 w-3.5" />
+                          {companyWebsite}
+                        </a>
+                      ) : (
+                        "Not provided"
+                      )}
+                    </dd>
                   </div>
                 </dl>
               </CardContent>
@@ -425,7 +455,7 @@ export default function ProspectDetail() {
             <Card className="border-slate-200">
               <CardHeader className="pb-4">
                 <div className="flex items-center gap-2 text-slate-900">
-                  <Users className="h-5 w-5" />
+                  <Briefcase className="h-5 w-5" />
                   <CardTitle className="text-xl font-semibold">Contact Details</CardTitle>
                 </div>
               </CardHeader>
@@ -447,7 +477,25 @@ export default function ProspectDetail() {
                     <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">Phone Number</dt>
                     <dd className="text-sm text-slate-900">{contactPhone}</dd>
                   </div>
+                  <div>
+                    <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">Address</dt>
+                    <dd className="text-sm text-slate-900">{contactAddress}</dd>
+                  </div>
                 </dl>
+              </CardContent>
+            </Card>
+          </div>
+          
+          <div className="mt-6">
+            <Card className="border-slate-200">
+              <CardHeader className="pb-4">
+                <div className="flex items-center gap-2 text-slate-900">
+                  <FileText className="h-5 w-5" />
+                  <CardTitle className="text-xl font-semibold">Notes</CardTitle>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-slate-900">Not provided</p>
               </CardContent>
             </Card>
           </div>
