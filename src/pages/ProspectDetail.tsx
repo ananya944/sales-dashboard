@@ -95,7 +95,7 @@ export default function ProspectDetail() {
     return `${countStr} employees`;
   };
   
-  const companySize = formatCompanySize(rawEmployeeCount);
+  const companySize = formatCompanySize(rawEmployeeCount ?? null);
 
   const organizationLocation = prospect.organization
     ? [
