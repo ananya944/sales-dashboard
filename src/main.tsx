@@ -7,7 +7,6 @@ import {
 	Route,
 } from 'react-router-dom'
 import SidebarLayout from './layouts/SidebarLayout'
-import Dashboard from './pages/Dashboard'
 import FinanceDashboard from './pages/FinanceDashboard'
 import Clients from './pages/Clients'
 import Employees from './pages/Employees'
