@@ -26,7 +26,7 @@ createRoot(document.getElementById('root')!).render(
     <BrowserRouter>
       <Routes>
         <Route element={<SidebarLayout />}> 
-          <Route index element={<Dashboard />} />
+          <Route index element={<Prospects />} />
           <Route path="finance/dashboard" element={<FinanceDashboard />} />
           <Route path="clients" element={<Clients />} />
           <Route path="clients/:id" element={<ClientDetails />} />

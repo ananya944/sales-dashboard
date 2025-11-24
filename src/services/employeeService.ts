@@ -75,6 +75,34 @@ export const getAllEmployees = async (): Promise<Employee[]> => {
   }
 };
 
+export const hasEmployeesForOrganization = async (
+  organizationId: string | null | undefined
+): Promise<boolean> => {
+  if (!organizationId) return false;
+
+  try {
+    const { count, error } = await supabase
+      .from('employees')
+      .select('id', { count: 'exact', head: true })
+      .eq('organization_id', organizationId);
+
+    if (error) {
+      console.error('Supabase error checking employee count:', {
+        code: error.code,
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+      });
+      throw error;
+    }
+
+    return (count ?? 0) > 0;
+  } catch (error) {
+    console.error('Error checking employees for organization:', error);
+    return false;
+  }
+};
+
 export const getEmployeeById = async (employeeId: string): Promise<Employee> => {
   try {
     console.log('Fetching employee with ID:', employeeId);

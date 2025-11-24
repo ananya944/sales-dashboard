@@ -295,7 +295,7 @@ export default function Clients() {
                     <TableHead className="py-3 px-4 w-44">Client Email</TableHead>
                     <TableHead className="py-3 px-4 w-24">Status</TableHead>
                     <TableHead className="py-3 px-4 w-20 text-right">MRR</TableHead>
-                    <TableHead className="py-3 px-3 w-10"></TableHead>
+                    <TableHead className="py-3 px-3 w-16 text-right whitespace-nowrap">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -343,7 +343,7 @@ export default function Clients() {
                         <TableCell className="py-3 px-4 text-right font-semibold text-slate-900 whitespace-nowrap">
                           {formatCurrency(client.mrr)}
                         </TableCell>
-                        <TableCell className="py-3 px-3">
+                        <TableCell className="py-3 px-3 text-right">
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                               <Button 

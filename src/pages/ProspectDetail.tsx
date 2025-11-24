@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Building, Mail, Phone, MapPin, Calendar, Clock, Users, Check, CalendarDays, UserPlus, FileText, Briefcase, Globe } from "lucide-react";
 import { getProspectById, type Prospect } from "@/services/prospectService";
+import { hasEmployeesForOrganization } from "@/services/employeeService";
+import { getProspectNotes, type ProspectNote } from "@/services/prospectNotesStore";
 import { format } from "date-fns";
 
 interface OnboardingStep {
@@ -23,6 +25,8 @@ export default function ProspectDetail() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("progress");
+  const [prospectNotes, setProspectNotes] = useState<ProspectNote[]>([]);
+  const [hasEmployees, setHasEmployees] = useState(false);
 
   useEffect(() => {
     async function loadProspect() {
@@ -53,6 +57,28 @@ export default function ProspectDetail() {
 
     loadProspect();
   }, [id]);
+
+  useEffect(() => {
+    if (!prospect?.id) return;
+    const notes = getProspectNotes(prospect.id);
+    setProspectNotes(notes);
+  }, [prospect?.id]);
+
+  useEffect(() => {
+    const checkEmployees = async () => {
+      if (!prospect?.organization_id && !prospect?.organization?.id) {
+        setHasEmployees(false);
+        return;
+      }
+
+      const hasEmployeeRecords = await hasEmployeesForOrganization(
+        prospect.organization_id || prospect.organization?.id || null
+      );
+      setHasEmployees(hasEmployeeRecords);
+    };
+
+    checkEmployees();
+  }, [prospect?.organization_id, prospect?.organization?.id]);
 
   if (loading) {
     return (
@@ -169,6 +195,18 @@ export default function ProspectDetail() {
       pushEvent("Last Active", "Last seen in product", prospect.last_login_at, 99);
     }
 
+    if (prospectNotes.length) {
+      prospectNotes.forEach((note, index) => {
+        events.push({
+          title: `Note by ${note.author || "Unknown user"}`,
+          description: note.content,
+          dateValue: note.createdAt ? new Date(note.createdAt) : null,
+          dateLabel: formatLabel(note.createdAt),
+          order: 150 + index,
+        });
+      });
+    }
+
     events.sort((a, b) => {
       if (a.dateValue && b.dateValue) {
         const diff = b.dateValue.getTime() - a.dateValue.getTime();
@@ -219,7 +257,7 @@ export default function ProspectDetail() {
       id: "employee",
       title: "Employee Added",
       description: "First employee added to the system",
-      completed: Boolean(prospect.onboarding_completed),
+      completed: hasEmployees,
     },
   ];
 
@@ -495,7 +533,23 @@ export default function ProspectDetail() {
                 </div>
               </CardHeader>
               <CardContent>
-                <p className="text-sm text-slate-900">Not provided</p>
+                {prospectNotes.length === 0 ? (
+                  <p className="text-sm text-slate-500">No notes have been added yet.</p>
+                ) : (
+                  <div className="space-y-4">
+                    {prospectNotes.map((note) => (
+                      <div key={note.id} className="rounded-lg border border-slate-200 p-3">
+                        <div className="flex items-center justify-between gap-4">
+                          <span className="text-sm font-semibold text-slate-900">{note.author}</span>
+                          <span className="text-xs text-slate-500 whitespace-nowrap">
+                            {format(new Date(note.createdAt), "MMM d, yyyy • h:mm a")}
+                          </span>
+                        </div>
+                        <p className="mt-2 text-sm text-slate-700 whitespace-pre-line">{note.content}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>

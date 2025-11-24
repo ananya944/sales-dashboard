@@ -9,7 +9,7 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
-import { Plus, Search, Users, Calendar, MoreVertical, Check, ChevronDown } from "lucide-react";
+import { Search, Users, Calendar, MoreVertical, Check, ChevronDown } from "lucide-react";
 import { format } from "date-fns";
 import { getAllEmployees } from "@/services/employeeService";
 import { getAllOrganizations } from "@/services/organizationService";
@@ -128,15 +128,6 @@ export default function Employees() {
     selectedClientId
   });
 
-  // Helper function to format currency
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency: 'INR',
-      minimumFractionDigits: 0,
-    }).format(amount);
-  };
-
   // Helper function to get initials
   const getInitials = (name: string) => {
     return name
@@ -156,13 +147,6 @@ export default function Employees() {
             Manage your workforce and employee lifecycle
           </p>
         </div>
-        <Button 
-          className="bg-indigo-600 hover:bg-indigo-700 text-white"
-          onClick={() => setAddEmployeeModalOpen(true)}
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          Add Employee
-        </Button>
       </div>
 
       {/* Search and Filters */}
@@ -289,14 +273,13 @@ export default function Employees() {
                     <TableHead className="py-3 px-6">Client</TableHead>
                     <TableHead className="py-3 px-6">Join Date</TableHead>
                     <TableHead className="py-3 px-6 w-32">Status</TableHead>
-                    <TableHead className="py-3 px-6 text-right">Salary</TableHead>
-                    <TableHead className="py-3 px-4 w-12"></TableHead>
+                    <TableHead className="py-3 px-4 w-16 text-right whitespace-nowrap">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {loading ? (
                     <TableRow className="h-12">
-                      <TableCell colSpan={8} className="text-center py-8">
+                      <TableCell colSpan={7} className="text-center py-8">
                         <div className="flex items-center justify-center">
                           <div className="w-6 h-6 border-4 border-indigo-600/30 border-t-indigo-600 rounded-full animate-spin" />
                           <p className="ml-3 text-slate-500">Loading employees...</p>
@@ -305,7 +288,7 @@ export default function Employees() {
                     </TableRow>
                   ) : filteredEmployees.length === 0 ? (
                     <TableRow className="h-12">
-                      <TableCell colSpan={8} className="text-center py-8 text-slate-500">
+                      <TableCell colSpan={7} className="text-center py-8 text-slate-500">
                         No employees found
                       </TableCell>
                     </TableRow>
@@ -348,10 +331,7 @@ export default function Employees() {
                               {status.charAt(0).toUpperCase() + status.slice(1)}
                             </StatusBadge>
                           </TableCell>
-                          <TableCell className="py-3 px-6 font-semibold text-slate-900 text-right">
-                            {employee.salary ? formatCurrency(employee.salary) : '-'}
-                          </TableCell>
-                          <TableCell className="py-3 px-4">
+                          <TableCell className="py-3 px-4 text-right">
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
                                 <Button 

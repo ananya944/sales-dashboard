@@ -15,6 +15,7 @@ export interface Prospect {
   compliance_completed: boolean | null;
   msa_signed: boolean | null;
   onboarding_completed: boolean | null;
+  onboarding_step: number | null;
   organization?: {
     id: string;
     name: string;
@@ -42,6 +43,9 @@ export interface ProspectDisplay {
   msaSigned: boolean;
   complianceCompleted: boolean;
   onboardingCompleted: boolean;
+  basicInfoCompleted: boolean;
+  companyInfoCompleted: boolean;
+  employeeAdded: boolean;
 }
 
 function normalizeBoolean(value: any): boolean {
@@ -55,13 +59,13 @@ function normalizeBoolean(value: any): boolean {
 }
 
 // Get onboarding progress label from completion flags
-function getProductUsageLabel(profile: any): string {
-  if (normalizeBoolean(profile.onboarding_completed)) return 'Employee Added';
-  if (normalizeBoolean(profile.compliance_completed)) return 'Compliance Declarations Completed';
+function getProductUsageLabel(profile: any, hasEmployee: boolean): string {
+  if (hasEmployee || normalizeBoolean(profile.onboarding_completed)) return 'Employee Added';
   if (normalizeBoolean(profile.msa_signed)) return 'MSA Signed';
-  if (normalizeBoolean(profile.address_completed)) return 'Address Completed';
+  if (normalizeBoolean(profile.compliance_completed)) return 'Compliance Declarations Completed';
   if (normalizeBoolean(profile.company_info_completed)) return 'Company Profile Completed';
-  if (normalizeBoolean(profile.basic_info_completed)) return 'Basic Information Completed';
+  if (normalizeBoolean(profile.basic_info_completed) || Number(profile.onboarding_step) === 2) return 'Basic Information Completed';
+  if (Number(profile.onboarding_step) === 1) return 'User Profile Created';
   return 'User Profile Created';
 }
 
@@ -113,6 +117,7 @@ export async function getProspects(): Promise<ProspectDisplay[]> {
         msa_signed,
         compliance_completed,
         onboarding_completed,
+        onboarding_step,
         organization:organizations (
           id,
           name,
@@ -127,10 +132,45 @@ export async function getProspects(): Promise<ProspectDisplay[]> {
     }
 
     console.log('✅ Raw prospects fetched from Supabase:', data)
-    const prospects: ProspectDisplay[] = (data || []).map((profile: any) => {
+
+    const filteredProfiles = (data || []).filter(
+      (profile: any) => !normalizeBoolean(profile.onboarding_completed)
+    )
+
+    const organizationIds = Array.from(
+      new Set(
+        filteredProfiles
+          .map((profile: any) => profile.organization_id)
+          .filter((id: string | null) => Boolean(id))
+      )
+    )
+
+    let organizationsWithEmployees = new Set<string>()
+    if (organizationIds.length > 0) {
+      const { data: employeeOrgRows, error: employeeError } = await supabase
+        .from('employees')
+        .select('organization_id')
+        .in('organization_id', organizationIds)
+
+      if (employeeError) {
+        console.error('❌ Supabase error loading employees for prospects:', employeeError)
+      } else if (employeeOrgRows) {
+        organizationsWithEmployees = new Set(
+          employeeOrgRows
+            .map((row: any) => row.organization_id)
+            .filter(Boolean)
+        )
+      }
+    }
+
+    const prospects: ProspectDisplay[] = filteredProfiles.map((profile: any) => {
       const fullName = [profile.first_name, profile.last_name]
         .filter(Boolean)
         .join(' ') || profile.email.split('@')[0] || 'Unknown User'
+
+      const hasEmployees = profile.organization_id
+        ? organizationsWithEmployees.has(profile.organization_id)
+        : false
 
       return {
         id: profile.id,
@@ -139,12 +179,15 @@ export async function getProspects(): Promise<ProspectDisplay[]> {
         email: profile.email,
         signupDate: formatDate(profile.created_at),
         lastActive: getTimeAgo(profile.last_login_at),
-        productUsage: getProductUsageLabel(profile),
+        productUsage: getProductUsageLabel(profile, hasEmployees),
         organizationId: profile.organization_id,
         companyName: profile.organization?.name ?? null,
         msaSigned: normalizeBoolean(profile.msa_signed),
         complianceCompleted: normalizeBoolean(profile.compliance_completed),
         onboardingCompleted: normalizeBoolean(profile.onboarding_completed),
+        basicInfoCompleted: normalizeBoolean(profile.basic_info_completed),
+        companyInfoCompleted: normalizeBoolean(profile.company_info_completed),
+        employeeAdded: hasEmployees || normalizeBoolean(profile.onboarding_completed),
       }
     })
 

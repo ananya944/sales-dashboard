@@ -1,5 +1,5 @@
 import { NavLink } from "react-router-dom";
-import { Home, Users, BarChart3, FileText, RefreshCw } from "lucide-react";
+import { Users, FileText, RefreshCw } from "lucide-react";
 
 export default function Sidebar() {
 	const linkBase = "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 no-underline";
@@ -34,12 +34,6 @@ export default function Sidebar() {
 				<SectionTitle>Workspace</SectionTitle>
 				<ul className="list-none space-y-1 px-2">
 					<li>
-						<NavLink to="/" end className={({ isActive }) => `${linkBase} ${isActive ? activeClasses : ""}`}>
-							<Home className="h-4 w-4" />
-							<span>Dashboard</span>
-						</NavLink>
-					</li>
-					<li>
 						<NavLink to="/prospects" className={({ isActive }) => `${linkBase} ${isActive ? activeClasses : ""}`}>
 							<Users className="h-4 w-4" />
 							<span>Prospects</span>
@@ -61,12 +55,6 @@ export default function Sidebar() {
 
 				<SectionTitle>Finance</SectionTitle>
 				<ul className="list-none space-y-1 px-2 pb-6">
-					<li>
-						<NavLink to="/finance/dashboard" className={({ isActive }) => `${linkBase} ${isActive ? activeClasses : ""}`}>
-							<BarChart3 className="h-4 w-4" />
-							<span>Dashboard</span>
-						</NavLink>
-					</li>
 					<li>
 						<NavLink to="/invoices" className={({ isActive }) => `${linkBase} ${isActive ? activeClasses : ""}`}>
 							<FileText className="h-4 w-4" />

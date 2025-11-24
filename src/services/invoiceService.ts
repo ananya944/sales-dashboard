@@ -4,26 +4,38 @@ export interface Invoice {
   invoice_id: string
   org_legal_name: string
   date: string
-  due_date: string | null
+  due_date?: string | null
   amount: number
-  tax_amount: number
+  tax_amount?: number
   status: string
-  currency: string
+  currency?: string
+  preview_link?: string | null
+  download_link?: string | null
 }
 
 export const getAllInvoices = async (): Promise<Invoice[]> => {
-  const { data, error } = await supabase
-    .from('zoho_invoices')
-    .select(
-      'invoice_id, org_legal_name, date, due_date, amount, tax_amount, status, currency',
-    )
-    .order('date', { ascending: false })
+  try {
+    // Select all columns - Supabase will return what exists
+    const { data, error } = await supabase
+      .from('zoho_invoices')
+      .select('*')
+      .order('date', { ascending: false })
 
-  if (error) {
-    console.error('Error fetching invoices from Supabase:', error)
-    throw error
+    if (error) {
+      console.error('Error fetching invoices from Supabase:', error)
+      console.error('Error details:', JSON.stringify(error, null, 2))
+      throw error
+    }
+
+    console.log('✅ Successfully fetched invoices:', data?.length || 0, 'records')
+    if (data && data.length > 0) {
+      console.log('Sample invoice:', data[0])
+    }
+    
+    return (data ?? []) as Invoice[]
+  } catch (err) {
+    console.error('Failed to fetch invoices:', err)
+    throw err
   }
-
-  return (data ?? []) as Invoice[]
 }
 
